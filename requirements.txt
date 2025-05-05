@@ -5,7 +5,10 @@ scikit-learn
 xgboost
 shap
 matplotlib
-geopandas
+seaborn
 joblib
+geopandas
 pyproj
 fiona
+altair
+plotly

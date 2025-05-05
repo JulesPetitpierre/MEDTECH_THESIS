@@ -8,6 +8,31 @@ import joblib
 st.set_page_config(page_title="MedTech M&A Summary", layout="wide")
 st.title("📊 MedTech M&A Failure Prediction Summary")
 
+with st.expander("👋 Welcome! Click to read the introduction"):
+    st.markdown("""
+    This application is the practical outcome of my Bachelor's thesis:
+
+    **"Decoding Mergers & Acquisitions Failures: Exploring the Complex Landscape of MedTech M&A Setbacks Through Advanced Risk Modeling Techniques"**
+
+    ---  
+    🔍 **What does failure mean in this context?**  
+    Here, failure refers to **withdrawn M&A transactions** — deals that are announced but never completed.  
+
+    Whether due to internal disagreements, regulatory issues, or unexpected due diligence outcomes, these withdrawals are a hidden but costly form of failure.  
+
+    ---  
+    🚀 **Why this tool matters**  
+    This app provides:  
+    - A **risk score** for deal failure  
+    - **Explanations** using SHAP  
+    - **Scenario testing** and portfolio evaluation  
+
+    Built with ambition, this tool bridges theory and real-world decision support for M&A professionals.
+
+    ---
+    ⚠️ **Note:** This version is not final yet, but will be completed very soon with further improvements, visuals, and appendix features.
+    """)
+
 # Load model and data
 df = pd.read_csv("ONLY_RELEVANT_M&A.csv")
 model = joblib.load("xgb_pipe.pkl")

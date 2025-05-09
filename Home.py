@@ -7,8 +7,13 @@ import joblib
 import json
 import plotly.express as px
 
-# Streamlit page setup
-st.set_page_config(page_title="MedTech M&A Summary", layout="wide")
+
+st.set_page_config(
+    page_title="MedTech M&A Failure Predictor",  # Title on browser tab
+    page_icon="🧬",  # Can be an emoji, or see Option 2 for a custom image
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
 
 # Custom styling
 st.markdown("""

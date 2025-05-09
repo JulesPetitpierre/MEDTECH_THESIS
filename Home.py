@@ -31,29 +31,29 @@ sns.set_palette("dark")
 
 st.title("MedTech M&A Failure Prediction Summary")
 
-with st.expander("👋 Welcome! Click to read the introduction"):
+with st.expander("Welcome. Click to read the introduction"):
     st.markdown("""
-    This application is the practical outcome of my Bachelor's thesis:
+    This application represents an **applied summarizing tool** developed as part of my Bachelor's thesis:
 
     **"Decoding Mergers & Acquisitions Failures: Exploring the Complex Landscape of MedTech M&A Setbacks Through Advanced Risk Modeling Techniques"**
 
-    ---  
-    🔍 **What does failure mean in this context?**  
-    Here, failure refers to **withdrawn M&A transactions** — deals that are announced but never completed.  
+    ---
+    **Defining Failure in This Context**  
+    In this research, failure refers specifically to **withdrawn M&A transactions** — deals that are formally announced but ultimately not completed.  
 
-    Whether due to internal disagreements, regulatory issues, or unexpected due diligence outcomes, these withdrawals are a hidden but costly form of failure.  
-
-    ---  
-    🚀 **Why this tool matters**  
-    This app provides:  
-    - A **risk score** for deal failure  
-    - **Explanations** using SHAP  
-    - **Scenario testing** and portfolio evaluation  
-
-    Built with ambition, this tool bridges theory and real-world decision support for M&A professionals.
+    Such withdrawals, whether driven by internal misalignment, regulatory barriers, or red flags uncovered during due diligence, often represent significant hidden costs.
 
     ---
-    ⚠️ **Note:** This version is not final yet, but will be completed very soon with further improvements, visuals, and appendix features.
+    **Purpose of This Tool**  
+    This interactive application enables users to:
+    - Generate a **predicted risk score** for deal failure  
+    - Understand **feature contributions** using SHAP explainability  
+    - Conduct **scenario testing** and evaluate risk across a portfolio  
+
+    Designed with ambition and practical impact in mind, this tool connects academic modeling with real-world decision-making in M&A.
+
+    ---
+    **Note:** This is an early version of the application and will be further refined in the coming days with enhanced visuals and extended functionality.
     """)
 
 # Load model and data
@@ -85,14 +85,14 @@ with col1:
     st.metric("Predicted Failures (≥50%)", filtered_df["predicted_class"].sum())
 
 with col2:
-    st.metric("Avg. Predicted Risk (%)", round(filtered_df["predicted_failure_prob"].mean() * 100, 2))
+    st.metric("Avg. Predicted Risk (%)"round(filtered_df["predicted_failure_prob"].mean() * 100, 2)), round(filtered_df["predicted_failure_prob"].mean() * 100, 2))
     st.metric("Deals with >75% Risk", (filtered_df["predicted_failure_prob"] > 0.75).sum())
     st.metric("Deals with <25% Risk", (filtered_df["predicted_failure_prob"] < 0.25).sum())
 
 st.markdown("---")
 
 # Predicted risk distribution
-st.subheader("📊 Predicted Risk Distribution")
+st.subheader("Predicted Risk Distribution")
 fig1, ax1 = plt.subplots(facecolor="#0B1A28")
 sns.histplot(filtered_df["predicted_failure_prob"] * 100, bins=20, ax=ax1, color="#1f77b4", edgecolor="white")
 ax1.set_facecolor("#0B1A28")

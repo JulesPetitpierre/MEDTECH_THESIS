@@ -10,7 +10,7 @@ import geopandas as gpd
 st.title("Explore the MedTech M&A Deal failures and a ML Model explain them")
 st.markdown("This Machine Learning tool predicts the **failure probability** of MedTech M&A deals using an interpretable XGBoost model.")
 
-with st.expander("ℹ️ SHAP Feature Index Reference"):
+with st.expander("SHAP Feature Index Reference"):
     st.markdown("""
     | Index | Feature Name |
     |-------|--------------|
@@ -83,7 +83,7 @@ features = model.named_steps["preprocessor"].get_feature_names_out()
 
 # --- Let user select a deal by Acquiror ---
 acquiror_list = full_data["Target Name (tmanames)"].dropna().unique().tolist()
-selected_acquiror = st.selectbox("🧠 Select a Deal by Target", acquiror_list)
+selected_acquiror = st.selectbox("Select a Deal by Target", acquiror_list)
 
 # --- Upload new data ---
 st.sidebar.header("Optional: Upload New Deal")
@@ -128,7 +128,7 @@ else:
 left_col, right_col = st.columns([2, 1])  # Wider left for prediction
 
 with left_col:
-    st.subheader("📊 Prediction percentage")
+    st.subheader("Prediction percentage")
     st.markdown(
         f"<h2 style='color:{bar_color};'>Predicted Failure Risk: {probability:.2f}%</h2>",
         unsafe_allow_html=True
@@ -151,7 +151,7 @@ with right_col:
             )
 
 # --- SHAP Explanation ---
-st.subheader("🔍 Explanation (SHAP), aka the power of variables in the development of the percentage points")
+st.subheader("Explanation (SHAP), aka the power of variables in the development of the percentage points")
 
 # Build explainer from classifier step
 explainer = shap.Explainer(model.named_steps["classifier"])
@@ -168,7 +168,7 @@ fig = plt.gcf()
 st.pyplot(fig)
 
 # --- Map Plot ---
-st.subheader("🌍 Company Locations")
+st.subheader("Company Locations")
 try:
     # Load local shapefile
     world = gpd.read_file("Countries/ne_110m_admin_0_countries.shp")

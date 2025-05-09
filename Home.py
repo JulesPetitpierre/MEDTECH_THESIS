@@ -85,7 +85,7 @@ with col1:
     st.metric("Predicted Failures (≥50%)", filtered_df["predicted_class"].sum())
 
 with col2:
-    st.metric("Avg. Predicted Risk (%)"round(filtered_df["predicted_failure_prob"].mean() * 100, 2)), round(filtered_df["predicted_failure_prob"].mean() * 100, 2))
+    st.metric("Avg. Predicted Risk (%)", round(filtered_df["predicted_failure_prob"].mean() * 100, 2))
     st.metric("Deals with >75% Risk", (filtered_df["predicted_failure_prob"] > 0.75).sum())
     st.metric("Deals with <25% Risk", (filtered_df["predicted_failure_prob"] < 0.25).sum())
 

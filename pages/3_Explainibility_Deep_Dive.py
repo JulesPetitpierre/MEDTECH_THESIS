@@ -65,14 +65,9 @@ st.pyplot(fig_bar)
 # --- Scatter: Feature-level SHAP visualization ---
 st.subheader("SHAP Value Scatter Plot")
 
-# Remove ID-type features and overly fragmented categorical features
+# Remove ID-type features from dropdown
 excluded = ["master_deal_no", "deal_no", "id"]
-dropdown_features = [
-    f for f in feature_names
-    if not any(ex in f.lower() for ex in excluded)
-    and not ("cat__" in f and "__" in f and len([s for s in feature_names if s.startswith(f.split('__')[0] + '__' + f.split('__')[1])]) > 30)
-]
-
+dropdown_features = [f for f in feature_names if not any(ex in f.lower() for ex in excluded)]
 selected_feature = st.selectbox("Select a Feature", dropdown_features)
 
 # Plot selected feature SHAP scatter

@@ -6,10 +6,75 @@ import shap
 import matplotlib.pyplot as plt
 import geopandas as gpd
 
-
 # Page title
 st.title("Explore the MedTech M&A Deal failures and a ML Model explain them")
 st.markdown("This Machine Learning tool predicts the **failure probability** of MedTech M&A deals using an interpretable XGBoost model.")
+
+with st.expander("ℹ️ SHAP Feature Index Reference"):
+    st.markdown("""
+    | Index | Feature Name |
+    |-------|--------------|
+    | 0     | Date Announced (dateann) |
+    | 1     | Unique DEAL ID (master_deal_no) |
+    | 2     | Target Name (tmanames) |
+    | 3     | Acquiror Name (amanames) |
+    | 4     | Acquiror is a Financial Sponsor (Yes/No Flag) (afinancial) |
+    | 5     | Acquiror is a Leverage Buyout Firm (albofirm) |
+    | 6     | Acquiror is a Limited Partnership Flag (alp) |
+    | 7     | Deal Attitude (attitude) |
+    | 8     | Deals is a Divestiture Flag (divest) |
+    | 9     | Division (division) |
+    | 10    | Form of transaction (form) |
+    | 11    | Percentage of consideration paid in cash (pct_cash) |
+    | 12    | Percentage of consideration paid in other then cash or stock (p) |
+    | 13    | Percentage of consideration paid in stock (pct_stk) |
+    | 14    | Percentage of consideration which is unknown (pct_unknown) |
+    | 15    | Percentage of Shares Sought (psought) |
+    | 16    | Percentage of Shares Acquiror is Seeking to Own After Transacti |
+    | 17    | Related Deals Flag (rd) |
+    | 18    | Deal is a Repurchase Flag (repurch) |
+    | 19    | Source of Funds Borrowing Flag (sfbor) |
+    | 20    | Source of Funds Common Stock Issue Flag (sfcom) |
+    | 21    | Financing via Internal Corporate Funds Flag (sfcorp) |
+    | 22    | Financing via Debt Securities Flag (sfdebt) |
+    | 23    | Financing via Line of Credit Flag (sflc) |
+    | 24    | Ranking Value incl Net Debt of Target (USD Mil) (rankval) |
+    | 25    | TR Acquiror Industry Description (atf_mid_desc) |
+    | 26    | TR Target Industry Description (ttf_mid_desc) |
+    | 27    | TR Acquiror Macro Description (atf_macro_desc) |
+    | 28    | TR Target Macro Description (ttf_macro_desc) |
+    | 29    | Acquiror Nation (anation) |
+    | 30    | Acquiror Nation Code (anationcode) |
+    | 31    | Target Nation (tnation) |
+    | 32    | Target Nation Code (tnationcode) |
+    | 33    | Target Public Status (tpublic) |
+    | 34    | Acquiror Public Status (apublic) |
+    | 35    | deal_value |
+    | 36    | Enterprise Value ($mil) (entval) |
+    | 37    | Equity Value ($mil) (eqval) |
+    | 38    | Price Per Share (pr) |
+    | 39    | Target Sales LTM ($mil) (salesltm) |
+    | 40    | Target EBIT LTM ($mil) (ebitltm) |
+    | 41    | Target Pre-Tax Income LTM ($mil) (ptincltm) |
+    | 42    | Target Net Income LTM ($mil) (niltm) |
+    | 43    | Target Net Assets ($mil) (netass) |
+    | 44    | Target Total Assets ($mil) (tass) |
+    | 45    | Target Cash Flow LTM ($mil) (cashflow) |
+    | 46    | Target Book Value ($mil) (bookvalue) |
+    | 47    | Target Common Equity ($mil) (commonequity) |
+    | 48    | Target Earnings Per Share ($mil) (epsltm) |
+    | 49    | Target Closing Stock Price 1 day Prior to Deal Announcement Day |
+    | 50    | Target Closing Stock Price 1 week Prior to Deal Announcement Da |
+    | 51    | Target Closing Stock Price 4 weeks Prior to Deal Announcement D |
+    | 52    | Consideration Offered (considoff) |
+    | 53    | Consideration Sought (considsought) |
+    | 54    | Vix |
+    | 55    | Interest rates |
+    | 56    | GDP growth |
+    | 57    | Healthcare growth |
+    | 58    | Covid19 |
+    | 59    | dateann |
+    """)
 
 # --- Load trained model and data ---
 model = joblib.load("xgb_pipe.pkl")

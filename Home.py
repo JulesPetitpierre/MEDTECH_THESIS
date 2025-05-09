@@ -71,6 +71,10 @@ df["predicted_class"] = (df["predicted_failure_prob"] >= 0.5).astype(int)
 with open("columns.json") as f:
     readable_names = json.load(f)
 
+# Remove non-informative features like Unique Deal ID
+excluded = ["Unique Deal ID", "dateann", "Unique DEAL ID (master_deal_no)"]
+readable_names = [name for name in readable_names if name not in excluded]
+
 # SHAP
 X_raw = df.drop(columns=["Deal Status (status)"], errors="ignore")
 X_preprocessed = model.named_steps["preprocessor"].transform(X_raw)

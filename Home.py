@@ -4,9 +4,32 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import joblib
 
-# Setup
+# Streamlit page setup
 st.set_page_config(page_title="MedTech M&A Summary", layout="wide")
-st.title("📊 MedTech M&A Failure Prediction Summary")
+
+# Custom styling
+st.markdown("""
+    <link href="https://fonts.googleapis.com/css2?family=Lato&display=swap" rel="stylesheet">
+    <style>
+    html, body, [class*="css"]  {
+        font-family: 'Lato', sans-serif;
+        background-color: #0B1A28;
+        color: white;
+    }
+    footer {visibility: hidden;}
+    .block-container {
+        padding-top: 2rem;
+        padding-bottom: 2rem;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
+# Set Seaborn and Matplotlib styling
+plt.style.use("dark_background")
+sns.set_style("darkgrid")
+sns.set_palette("dark")
+
+st.title("MedTech M&A Failure Prediction Summary")
 
 with st.expander("👋 Welcome! Click to read the introduction"):
     st.markdown("""
@@ -53,7 +76,7 @@ if selected_country:
     filtered_df = filtered_df[filtered_df["Target Nation (tnation)"] == selected_country]
 
 # Display summary metrics
-st.markdown("### 📈 Failure Statistics Overview")
+st.markdown("### Failure Statistics Overview")
 col1, col2 = st.columns(2)
 
 with col1:
@@ -68,23 +91,28 @@ with col2:
 
 st.markdown("---")
 
-# 📊 Predicted risk distribution
+# Predicted risk distribution
 st.subheader("📊 Predicted Risk Distribution")
-fig1, ax1 = plt.subplots()
-sns.histplot(filtered_df["predicted_failure_prob"] * 100, bins=20, ax=ax1, color="#1f77b4", edgecolor="black")
-ax1.set_xlabel("Predicted Failure Probability (%)")
+fig1, ax1 = plt.subplots(facecolor="#0B1A28")
+sns.histplot(filtered_df["predicted_failure_prob"] * 100, bins=20, ax=ax1, color="#1f77b4", edgecolor="white")
+ax1.set_facecolor("#0B1A28")
+ax1.set_xlabel("Predicted Failure Probability (%)", color="white")
+ax1.set_ylabel("Count", color="white")
+ax1.tick_params(colors="white")
 st.pyplot(fig1)
 
-# 🌍 Failure count by country
-st.subheader("🌍 Failure Count by Country")
+# Failure count by country
+st.subheader("Failure Count by Country")
 country_df = (
     filtered_df.groupby("Target Nation (tnation)")
     .agg(actual_failures=("Deal Status (status)", "sum"), predicted_failures=("predicted_class", "sum"))
     .sort_values("actual_failures", ascending=False)
     .head(15)
 )
-fig2, ax2 = plt.subplots()
-country_df.plot(kind="bar", ax=ax2, color=["#1f77b4", "#2ecc71"])  # blue + green
-ax2.set_ylabel("Count")
-ax2.set_title("Actual vs Predicted Failures by Country")
+fig2, ax2 = plt.subplots(facecolor="#0B1A28")
+country_df.plot(kind="bar", ax=ax2, color=["#1f77b4", "#2ecc71"], edgecolor="white")
+ax2.set_facecolor("#0B1A28")
+ax2.set_ylabel("Count", color="white")
+ax2.set_title("Actual vs Predicted Failures by Country", color="white")
+ax2.tick_params(colors="white")
 st.pyplot(fig2)

@@ -27,7 +27,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Plot styling
+# Styling
 plt.style.use("dark_background")
 sns.set_style("darkgrid")
 sns.set_palette("dark")
@@ -59,7 +59,7 @@ with st.expander("Welcome. Click to read the introduction"):
     **Note:** This is an early version of the application and will be further refined in the coming days with enhanced visuals and extended functionality.
     """)
 
-# Load data and model
+# Load model and data
 df = pd.read_csv("ONLY_RELEVANT_M&A.csv")
 model = joblib.load("xgb_pipe.pkl")
 X = df.drop(columns=["Deal Status (status)"])
@@ -67,28 +67,28 @@ y = df["Deal Status (status)"]
 df["predicted_failure_prob"] = model.predict_proba(X)[:, 1]
 df["predicted_class"] = (df["predicted_failure_prob"] >= 0.5).astype(int)
 
-# Load feature name mapping
+# Load readable names
 with open("columns.json") as f:
     readable_names = json.load(f)
 
-# Prepare SHAP values
+# SHAP
 X_raw = df.drop(columns=["Deal Status (status)"], errors="ignore")
 X_preprocessed = model.named_steps["preprocessor"].transform(X_raw)
 feature_names = model.named_steps["preprocessor"].get_feature_names_out()
 explainer = shap.Explainer(model.named_steps["classifier"], feature_names=feature_names)
 shap_values = explainer(X_preprocessed)
 
-# Country filter
+# Sidebar filter
 st.sidebar.header("Choose a Specific Country")
 countries = sorted(df["Target Nation (tnation)"].dropna().unique())
 selected_country = st.sidebar.selectbox("Country look of", options=[None] + countries)
 filtered_df = df if selected_country is None else df[df["Target Nation (tnation)"] == selected_country]
 
-# Layout: summary stats + 3D plot side-by-side
+# Layout block
 st.markdown("### Summary Statistics and 3D SHAP Visual")
 col1, col2 = st.columns([1, 1.5])
 
-# Left column: summary metrics
+# Summary metrics
 with col1:
     st.metric("Total Deals", len(filtered_df))
     st.metric("Actual Failures", filtered_df["Deal Status (status)"].sum())
@@ -97,19 +97,22 @@ with col1:
     st.metric("Deals with >75% Risk", (filtered_df["predicted_failure_prob"] > 0.75).sum())
     st.metric("Deals with <25% Risk", (filtered_df["predicted_failure_prob"] < 0.25).sum())
 
-# Right column: plot if default selection exists
+# SHAP Feature selection and plot
 with col2:
     st.markdown("#### Interactive 3D SHAP Plot")
 
-    # Default initial selection
-    default_x = readable_names[0]
-    default_y = readable_names[1]
-    default_z = readable_names[2]
+    col3, col4, col5 = st.columns(3)
+    with col3:
+        feature1 = st.selectbox("X-axis", readable_names, key="shap3d_x")
+    with col4:
+        feature2 = st.selectbox("Y-axis", readable_names, key="shap3d_y")
+    with col5:
+        shap_target = st.selectbox("Z-axis (SHAP of)", readable_names, key="shap3d_z")
 
     try:
-        idx_x = readable_names.index(default_x)
-        idx_y = readable_names.index(default_y)
-        idx_z = readable_names.index(default_z)
+        idx_x = readable_names.index(feature1)
+        idx_y = readable_names.index(feature2)
+        idx_z = readable_names.index(shap_target)
 
         x_vals = X_preprocessed[:, idx_x].toarray().flatten() if hasattr(X_preprocessed, "toarray") else X_preprocessed[:, idx_x]
         y_vals = X_preprocessed[:, idx_y].toarray().flatten() if hasattr(X_preprocessed, "toarray") else X_preprocessed[:, idx_y]
@@ -120,20 +123,11 @@ with col2:
             y=y_vals,
             z=z_vals,
             color=z_vals,
-            labels={"x": default_x, "y": default_y, "z": f"SHAP: {default_z}"},
+            labels={"x": feature1, "y": feature2, "z": f"SHAP: {shap_target}"},
             opacity=0.7
         )
         fig.update_layout(margin=dict(l=0, r=0, b=0, t=30))
         st.plotly_chart(fig, use_container_width=True)
+
     except Exception as e:
         st.error(f"Could not generate 3D plot: {e}")
-
-# Full-width variable selectors
-st.markdown("### Customize 3D SHAP Axes")
-col3, col4, col5 = st.columns(3)
-with col3:
-    feature1 = st.selectbox("X-axis", readable_names, key="shap3d_x")
-with col4:
-    feature2 = st.selectbox("Y-axis", readable_names, key="shap3d_y")
-with col5:
-    shap_target = st.selectbox("Z-axis (SHAP of)", readable_names, key="shap3d_z")

@@ -7,7 +7,7 @@ import numpy as np
 
 # Setup
 st.set_page_config(page_title="Explainability Deep Dive", layout="wide")
-st.title("🔍 Explainability Deep Dive")
+st.title("Explainability Deep Dive")
 
 # Load model and data
 model = joblib.load("xgb_pipe.pkl")
@@ -23,16 +23,16 @@ explainer = shap.Explainer(model.named_steps["classifier"], feature_names=featur
 shap_values = explainer(X_preprocessed)
 
 # --- Controls for SHAP Summary ---
-st.subheader("📊 Global SHAP Summary Plot (Customizable)")
+st.subheader("Global SHAP Summary Plot (Customizable)")
 
 col1, col2 = st.columns(2)
 with col1:
     stat_choice = st.selectbox(
-        "✅ Select SHAP statistic",
+        "Select SHAP statistic",
         options=["Mean |SHAP|", "Median SHAP", "SHAP Std Dev"]
     )
 with col2:
-    top_n = st.selectbox("🔢 How many top features?", options=[10, 20])
+    top_n = st.selectbox("How many top features?", options=[10, 20])
 
 # Compute importance
 shap_matrix = shap_values.values
@@ -63,7 +63,7 @@ ax_bar.set_title("SHAP Feature Importance")
 st.pyplot(fig_bar)
 
 # --- Scatter: Feature-level SHAP visualization ---
-st.subheader("📈 SHAP Value Scatter Plot")
+st.subheader("SHAP Value Scatter Plot")
 
 # Remove ID-type features from dropdown
 excluded = ["master_deal_no", "deal_no", "id"]

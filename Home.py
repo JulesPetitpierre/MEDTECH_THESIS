@@ -1,8 +1,10 @@
+import shap
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 import joblib
+import json
 
 # Streamlit page setup
 st.set_page_config(page_title="MedTech M&A Summary", layout="wide")
@@ -91,28 +93,48 @@ with col2:
 
 st.markdown("---")
 
-# Predicted risk distribution
-st.subheader("Predicted Risk Distribution")
-fig1, ax1 = plt.subplots(facecolor="#0B1A28")
-sns.histplot(filtered_df["predicted_failure_prob"] * 100, bins=20, ax=ax1, color="#1f77b4", edgecolor="white")
-ax1.set_facecolor("#0B1A28")
-ax1.set_xlabel("Predicted Failure Probability (%)", color="white")
-ax1.set_ylabel("Count", color="white")
-ax1.tick_params(colors="white")
-st.pyplot(fig1)
+# Load model and data
+model = joblib.load("xgb_pipe.pkl")
+df = pd.read_csv("ONLY_RELEVANT_M&A.csv")
 
-# Failure count by country
-st.subheader("Failure Count by Country")
-country_df = (
-    filtered_df.groupby("Target Nation (tnation)")
-    .agg(actual_failures=("Deal Status (status)", "sum"), predicted_failures=("predicted_class", "sum"))
-    .sort_values("actual_failures", ascending=False)
-    .head(15)
-)
-fig2, ax2 = plt.subplots(facecolor="#0B1A28")
-country_df.plot(kind="bar", ax=ax2, color=["#1f77b4", "#2ecc71"], edgecolor="white")
-ax2.set_facecolor("#0B1A28")
-ax2.set_ylabel("Count", color="white")
-ax2.set_title("Actual vs Predicted Failures by Country", color="white")
-ax2.tick_params(colors="white")
-st.pyplot(fig2)
+# Prepare features
+X_raw = df.drop(columns=["Deal Status (status)"], errors="ignore")
+X_preprocessed = model.named_steps["preprocessor"].transform(X_raw)
+feature_names = model.named_steps["preprocessor"].get_feature_names_out()
+explainer = shap.Explainer(model.named_steps["classifier"], feature_names=feature_names)
+shap_values = explainer(X_preprocessed)
+
+# Load readable names
+with open("columns.json") as f:
+    readable_names = json.load(f)
+
+# Select 2 features + SHAP value dimension
+st.subheader("📈 Interactive 3D SHAP Scatter")
+feature1 = st.selectbox("X-axis: Feature", readable_names, key="shap3d_x")
+feature2 = st.selectbox("Y-axis: Feature", readable_names, key="shap3d_y")
+shap_target = st.selectbox("Z-axis: SHAP Value of", readable_names, key="shap3d_z")
+
+# Index conversion
+try:
+    idx_x = readable_names.index(feature1)
+    idx_y = readable_names.index(feature2)
+    idx_z = readable_names.index(shap_target)
+
+    x_vals = X_preprocessed[:, idx_x].toarray().flatten() if hasattr(X_preprocessed, "toarray") else X_preprocessed[:, idx_x]
+    y_vals = X_preprocessed[:, idx_y].toarray().flatten() if hasattr(X_preprocessed, "toarray") else X_preprocessed[:, idx_y]
+    z_vals = shap_values[:, idx_z].values.flatten()
+
+    # Plotly 3D scatter
+    fig = px.scatter_3d(
+        x=x_vals,
+        y=y_vals,
+        z=z_vals,
+        color=z_vals,
+        labels={"x": feature1, "y": feature2, "z": f"SHAP: {shap_target}"},
+        opacity=0.7
+    )
+    fig.update_layout(margin=dict(l=0, r=0, b=0, t=30))
+    st.plotly_chart(fig, use_container_width=True)
+
+except Exception as e:
+    st.error(f"Could not generate 3D plot: {e}")

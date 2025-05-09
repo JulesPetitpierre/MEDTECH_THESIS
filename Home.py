@@ -62,80 +62,64 @@ with st.expander("Welcome. Click to read the introduction"):
 # Load model and data
 df = pd.read_csv("ONLY_RELEVANT_M&A.csv")
 model = joblib.load("xgb_pipe.pkl")
-
-# Predict failure probabilities
 X = df.drop(columns=["Deal Status (status)"])
 y = df["Deal Status (status)"]
 df["predicted_failure_prob"] = model.predict_proba(X)[:, 1]
 df["predicted_class"] = (df["predicted_failure_prob"] >= 0.5).astype(int)
 
-# Sidebar filters
-st.sidebar.header("Choose a Specific Country")
-countries = sorted(df["Target Nation (tnation)"].dropna().unique())
-selected_country = st.sidebar.selectbox("Country look of", options=[None] + countries)
+# Load readable names
+with open("columns.json") as f:
+    readable_names = json.load(f)
 
-filtered_df = df.copy()
-if selected_country:
-    filtered_df = filtered_df[filtered_df["Target Nation (tnation)"] == selected_country]
-
-# Display summary metrics
-st.markdown("### Failure Statistics Overview")
-col1, col2 = st.columns(2)
-
-with col1:
-    st.metric("Total Deals", len(filtered_df))
-    st.metric("Actual Failures", filtered_df["Deal Status (status)"].sum())
-    st.metric("Predicted Failures (≥50%)", filtered_df["predicted_class"].sum())
-
-with col2:
-    st.metric("Avg. Predicted Risk (%)", round(filtered_df["predicted_failure_prob"].mean() * 100, 2))
-    st.metric("Deals with >75% Risk", (filtered_df["predicted_failure_prob"] > 0.75).sum())
-    st.metric("Deals with <25% Risk", (filtered_df["predicted_failure_prob"] < 0.25).sum())
-
-st.markdown("---")
-
-# Load model and data
-model = joblib.load("xgb_pipe.pkl")
-df = pd.read_csv("ONLY_RELEVANT_M&A.csv")
-
-# Prepare features
+# Prepare features for SHAP
 X_raw = df.drop(columns=["Deal Status (status)"], errors="ignore")
 X_preprocessed = model.named_steps["preprocessor"].transform(X_raw)
 feature_names = model.named_steps["preprocessor"].get_feature_names_out()
 explainer = shap.Explainer(model.named_steps["classifier"], feature_names=feature_names)
 shap_values = explainer(X_preprocessed)
 
-# Load readable names
-with open("columns.json") as f:
-    readable_names = json.load(f)
+# Sidebar filters
+st.sidebar.header("Choose a Specific Country")
+countries = sorted(df["Target Nation (tnation)"].dropna().unique())
+selected_country = st.sidebar.selectbox("Country look of", options=[None] + countries)
+filtered_df = df if selected_country is None else df[df["Target Nation (tnation)"] == selected_country]
 
-# Select 2 features + SHAP value dimension
-st.subheader("📈 Interactive 3D SHAP Scatter")
-feature1 = st.selectbox("X-axis: Feature", readable_names, key="shap3d_x")
-feature2 = st.selectbox("Y-axis: Feature", readable_names, key="shap3d_y")
-shap_target = st.selectbox("Z-axis: SHAP Value of", readable_names, key="shap3d_z")
+# --- SUMMARY METRICS + 3D PLOT LAYOUT ---
+st.markdown("### Summary Statistics and 3D SHAP Visual")
 
-# Index conversion
-try:
-    idx_x = readable_names.index(feature1)
-    idx_y = readable_names.index(feature2)
-    idx_z = readable_names.index(shap_target)
+col1, col2 = st.columns([1, 1.5])
+with col1:
+    st.metric("Total Deals", len(filtered_df))
+    st.metric("Actual Failures", filtered_df["Deal Status (status)"].sum())
+    st.metric("Predicted Failures (≥50%)", filtered_df["predicted_class"].sum())
+    st.metric("Avg. Predicted Risk (%)", round(filtered_df["predicted_failure_prob"].mean() * 100, 2))
+    st.metric("Deals with >75% Risk", (filtered_df["predicted_failure_prob"] > 0.75).sum())
+    st.metric("Deals with <25% Risk", (filtered_df["predicted_failure_prob"] < 0.25).sum())
 
-    x_vals = X_preprocessed[:, idx_x].toarray().flatten() if hasattr(X_preprocessed, "toarray") else X_preprocessed[:, idx_x]
-    y_vals = X_preprocessed[:, idx_y].toarray().flatten() if hasattr(X_preprocessed, "toarray") else X_preprocessed[:, idx_y]
-    z_vals = shap_values[:, idx_z].values.flatten()
+with col2:
+    st.markdown("#### Interactive 3D SHAP Plot")
+    feature1 = st.selectbox("X-axis: Feature", readable_names, key="shap3d_x")
+    feature2 = st.selectbox("Y-axis: Feature", readable_names, key="shap3d_y")
+    shap_target = st.selectbox("Z-axis: SHAP Value of", readable_names, key="shap3d_z")
 
-    # Plotly 3D scatter
-    fig = px.scatter_3d(
-        x=x_vals,
-        y=y_vals,
-        z=z_vals,
-        color=z_vals,
-        labels={"x": feature1, "y": feature2, "z": f"SHAP: {shap_target}"},
-        opacity=0.7
-    )
-    fig.update_layout(margin=dict(l=0, r=0, b=0, t=30))
-    st.plotly_chart(fig, use_container_width=True)
+    try:
+        idx_x = readable_names.index(feature1)
+        idx_y = readable_names.index(feature2)
+        idx_z = readable_names.index(shap_target)
 
-except Exception as e:
-    st.error(f"Could not generate 3D plot: {e}")
+        x_vals = X_preprocessed[:, idx_x].toarray().flatten() if hasattr(X_preprocessed, "toarray") else X_preprocessed[:, idx_x]
+        y_vals = X_preprocessed[:, idx_y].toarray().flatten() if hasattr(X_preprocessed, "toarray") else X_preprocessed[:, idx_y]
+        z_vals = shap_values[:, idx_z].values.flatten()
+
+        fig = px.scatter_3d(
+            x=x_vals,
+            y=y_vals,
+            z=z_vals,
+            color=z_vals,
+            labels={"x": feature1, "y": feature2, "z": f"SHAP: {shap_target}"},
+            opacity=0.7
+        )
+        fig.update_layout(margin=dict(l=0, r=0, b=0, t=30))
+        st.plotly_chart(fig, use_container_width=True)
+    except Exception as e:
+        st.error(f"Could not generate 3D plot: {e}")

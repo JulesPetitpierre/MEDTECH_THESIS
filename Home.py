@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import joblib
 import json
+import plotly.express as px
 
 # Streamlit page setup
 st.set_page_config(page_title="MedTech M&A Summary", layout="wide")

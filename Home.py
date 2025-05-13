@@ -41,7 +41,7 @@ st.title("MedTech M&A Failure Prediction Summary")
 
 with st.expander("Welcome. Click to read the introduction"):
     st.markdown("""
-    This application represents an **applied summarizing tool** developed as part of my Bachelor's thesis:
+    This application represents an **applied summarizing tool of my tuned XGBoost Machine Learning Model and its results** developed as part of my Bachelor's thesis:
 
     **"Decoding Mergers & Acquisitions Failures: Exploring the Complex Landscape of MedTech M&A Setbacks Through Advanced Risk Modeling Techniques"**
 

@@ -95,22 +95,24 @@ readable_names = [name for name in readable_names if name not in excluded]
 #============================================================
 # === SHAP Explainer Setup ===
 
+from shap import TreeExplainer
+
 # Extract components
 preprocessor = pipeline.named_steps["preprocessor"]
 calibrated_clf = pipeline.named_steps["classifier"]
 
-# Use .estimator instead of .base_estimator for cv='prefit'
+# Get the underlying XGBoost model
 xgb_model = calibrated_clf.estimator
 
-# Preprocess features
+# Preprocess data
 X_raw = df.drop(columns=["Deal Status (status)"], errors="ignore")
 X_preprocessed = preprocessor.transform(X_raw)
 
-# Feature names
+# Get feature names
 feature_names = preprocessor.get_feature_names_out()
 
-# SHAP explainer using raw XGB model
-explainer = shap.Explainer(xgb_model, feature_names=feature_names)
+# SHAP with explicit TreeExplainer (works for XGBoost)
+explainer = TreeExplainer(xgb_model)
 shap_values = explainer(X_preprocessed)
 
 # ============================================================

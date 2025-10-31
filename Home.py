@@ -74,7 +74,6 @@ with st.expander("Welcome. Click to read the introduction"):
 df = pd.read_csv("ONLY_RELEVANT_M&A.csv")
 
 # Load preprocessor and calibrated model separately
-preprocessor = joblib.load("preprocessor_for_xgboost.joblib")
 model = joblib.load("calibrated_estimator_xgboost.joblib")
 
 # Prepare data

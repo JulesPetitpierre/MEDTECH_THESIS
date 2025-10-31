@@ -15,6 +15,44 @@ from shap import TreeExplainer
 
 st.set_page_config(
     page_title="MedTech M&A Failure Predictor",
+    
+    with st.expander("ℹ️ What is this app? Disclaimer & Context (Click to expand)"):
+    st.markdown("""
+    ### 🎓 Thesis Context and Academic Objective  
+    This interactive application is part of the Bachelor’s thesis:  
+    **“Exploring the Complex Landscape of MedTech M&A Setbacks Using Machine Learning”**  
+    submitted at the **University of St. Gallen (HSG)**.  
+
+    The tool translates a calibrated XGBoost classification model into a user-facing interface. It enables exploration of **predicted failure probabilities** for MedTech M&A transactions between 2014 and 2025. Failure is defined as deals that were announced but not completed (i.e., withdrawn or terminated).  
+
+    The underlying model was trained on financial, transactional, and macroeconomic variables extracted from a cleaned dataset of 630 fully disclosed MedTech acquisitions. The interface provides prediction results, local SHAP explanations, and global interpretability tools in a fully self-contained dashboard.
+
+    ---
+
+    ### 🧠 What This App Does  
+    - Predicts the **ex-ante failure risk** of a MedTech M&A transaction  
+    - Shows a **feature-level explanation** (SHAP) of the prediction  
+    - Lets users interactively explore **why** certain deals are flagged as high- or low-risk  
+    - Displays **global model behaviour**, feature importance, and model calibration  
+
+    The predictions are based on a calibrated XGBoost classifier trained using Scikit-learn and SHAP. All predictions and explanations shown here are **out-of-sample**, derived from the test data split (post-2019 deals).
+
+    ---
+
+    ### ⚠️ Legal and Academic Disclaimer  
+    This tool is intended for **academic demonstration only**.  
+    - It is **not suitable** for use in commercial due diligence, investment decision-making, legal advisory, or financial forecasting.  
+    - The model was trained on historical, publicly available MedTech data and is **not updated in real time**.  
+    - Interpretability plots are approximations based on SHAP theory and should not be over-interpreted as causal evidence.  
+
+    Please consult qualified professionals before using any predictive tool in real-world financial or strategic contexts.
+
+    ---
+
+    ### 🧬 Ready to Explore?  
+    Now take your mouse and **explore some MedTech**.
+    """)
+    
     page_icon="🧬",
     layout="wide",
     initial_sidebar_state="expanded"

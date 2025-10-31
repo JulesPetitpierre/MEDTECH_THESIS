@@ -92,25 +92,24 @@ with open("columns.json") as f:
 excluded = ["Unique Deal ID", "dateann", "Unique DEAL ID (master_deal_no)"]
 readable_names = [name for name in readable_names if name not in excluded]
 
-
-# =============================================================
-# === SHAP Explainer Setup ===========
+#============================================================
+# === SHAP Explainer Setup ===
 
 # Extract components
 preprocessor = pipeline.named_steps["preprocessor"]
 calibrated_clf = pipeline.named_steps["classifier"]
 
-# SHAP only works with the base estimator inside CalibratedClassifierCV
-xgb_model = calibrated_clf.base_estimator
+# Use .estimator instead of .base_estimator for cv='prefit'
+xgb_model = calibrated_clf.estimator
 
-# Preprocess data
+# Preprocess features
 X_raw = df.drop(columns=["Deal Status (status)"], errors="ignore")
 X_preprocessed = preprocessor.transform(X_raw)
 
-# Get feature names
+# Feature names
 feature_names = preprocessor.get_feature_names_out()
 
-# Compute SHAP values using only the base model
+# SHAP explainer using raw XGB model
 explainer = shap.Explainer(xgb_model, feature_names=feature_names)
 shap_values = explainer(X_preprocessed)
 

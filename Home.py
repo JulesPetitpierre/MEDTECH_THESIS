@@ -70,40 +70,34 @@ with st.expander("Welcome. Click to read the introduction"):
     """)
 
 # ============================================================
-# LOAD MODEL AND TEST DATA ONLY
+# LOAD MODEL AND DATA
 # ============================================================
 
-# Load dataset and extract year
 df = pd.read_csv("ONLY_RELEVANT_M&A.csv")
 df["Date Announced (dateann)"] = pd.to_datetime(df["Date Announced (dateann)"], errors="coerce")
 df["ann_year"] = df["Date Announced (dateann)"].dt.year
 
-# Keep only post-2019 (test period)
+# Temporal test split: only post-2019
 test_df = df[df["ann_year"] > 2019].copy()
 
-# Extract target and features
-y = test_df["Deal Status (status)"].astype(int)
+# Extract raw features and target
 X_raw = test_df.drop(columns=["Deal Status (status)"], errors="ignore")
+y = test_df["Deal Status (status)"]
 
-# Defensive fix: ensure categorical safety
+# 🔒 Cast all object columns to string to avoid unseen category errors
 for col in X_raw.select_dtypes(include="object").columns:
-    X_raw[col] = X_raw[col].fillna("MISSING").astype(str)
+    X_raw[col] = X_raw[col].astype(str)
 
-# Load model and components
+# Load model
 pipeline = joblib.load("safe_pipeline_xgb.joblib")
 preprocessor = pipeline.named_steps["preprocessor"]
 calibrated_clf = pipeline.named_steps["classifier"]
 xgb_model = calibrated_clf.calibrated_classifiers_[0].estimator
 
-# Predict using pipeline (no manual transform)
+# Preprocess and predict on test only
+X_preprocessed = preprocessor.transform(X_raw)
 test_df["predicted_failure_prob"] = pipeline.predict_proba(X_raw)[:, 1]
 test_df["predicted_class"] = (test_df["predicted_failure_prob"] >= 0.60).astype(int)
-
-# Load readable feature names
-with open("columns.json") as f:
-    readable_names = json.load(f)
-excluded = ["Unique Deal ID", "dateann", "Unique DEAL ID (master_deal_no)"]
-readable_names = [name for name in readable_names if name not in excluded]
 
 # ============================================================
 # SHAP EXPLAINER

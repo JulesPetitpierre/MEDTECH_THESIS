@@ -6,6 +6,7 @@ import seaborn as sns
 import joblib
 import json
 import plotly.express as px
+from shap import TreeExplainer
 
 # ============================================================
 # PAGE CONFIGURATION
@@ -72,44 +73,32 @@ with st.expander("Welcome. Click to read the introduction"):
 # ============================================================
 
 df = pd.read_csv("ONLY_RELEVANT_M&A.csv")
-
-# Load full pipeline (preprocessor + calibrated classifier)
 pipeline = joblib.load("safe_pipeline_xgb.joblib")
 
-# Extract X and y
+# Extract raw features
 X_raw = df.drop(columns=["Deal Status (status)"], errors="ignore")
 y = df["Deal Status (status)"]
 
-# Preprocess and predict
-X_preprocessed = pipeline.named_steps["preprocessor"].transform(X_raw)
+# Preprocess + Predict
+preprocessor = pipeline.named_steps["preprocessor"]
+calibrated_clf = pipeline.named_steps["classifier"]
+xgb_model = calibrated_clf.calibrated_classifiers_[0].estimator
+
+X_preprocessed = preprocessor.transform(X_raw)
 df["predicted_failure_prob"] = pipeline.predict_proba(X_raw)[:, 1]
 df["predicted_class"] = (df["predicted_failure_prob"] >= 0.60).astype(int)
 
-# Load readable feature names
+# Load human-readable feature names
 with open("columns.json") as f:
     readable_names = json.load(f)
-
 excluded = ["Unique Deal ID", "dateann", "Unique DEAL ID (master_deal_no)"]
 readable_names = [name for name in readable_names if name not in excluded]
 
-#============================================================
-# === SHAP Explainer Setup ===
+# ============================================================
+# SHAP EXPLAINER SETUP
+# ============================================================
 
-from shap import TreeExplainer
-
-# Extract components from the pipeline
-preprocessor = pipeline.named_steps["preprocessor"]
-calibrated_clf = pipeline.named_steps["classifier"]
-
-# Access the first fitted estimator inside the calibrated model
-xgb_model = calibrated_clf.calibrated_classifiers_[0].estimator
-
-# Prepare the data
-X_raw = df.drop(columns=["Deal Status (status)"], errors="ignore")
-X_preprocessed = preprocessor.transform(X_raw)
 feature_names = preprocessor.get_feature_names_out()
-
-# Create SHAP explainer
 explainer = TreeExplainer(xgb_model)
 shap_values = explainer(X_preprocessed)
 
@@ -123,7 +112,7 @@ selected_country = st.sidebar.selectbox("Filter by Target Country", options=[Non
 filtered_df = df if selected_country is None else df[df["Target Nation (tnation)"] == selected_country]
 
 # ============================================================
-# SUMMARY METRICS AND 3D SHAP
+# SUMMARY METRICS + SHAP VISUALIZATION
 # ============================================================
 
 st.markdown("### Summary Statistics and Interactive SHAP Visualization")
@@ -153,14 +142,19 @@ with col2:
         idx_y = readable_names.index(feature2)
         idx_z = readable_names.index(shap_target)
 
-        x_vals = X_preprocessed[:, idx_x]
-        y_vals = X_preprocessed[:, idx_y]
+        # Handle sparse matrices
+        def safe_column(matrix, idx):
+            col = matrix[:, idx]
+            return col.toarray().flatten() if hasattr(col, "toarray") else np.array(col).flatten()
+
+        x_vals = safe_column(X_preprocessed, idx_x)
+        y_vals = safe_column(X_preprocessed, idx_y)
         z_vals = shap_values[:, idx_z].values.flatten()
 
         fig = px.scatter_3d(
-            x_vals = X_preprocessed[:, idx_x].toarray().flatten()
-            y_vals = X_preprocessed[:, idx_y].toarray().flatten()
-            z_vals = shap_values[:, idx_z].values.flatten()
+            x=x_vals,
+            y=y_vals,
+            z=z_vals,
             color=z_vals,
             labels={"x": feature1, "y": feature2, "z": f"SHAP: {shap_target}"},
             opacity=0.7

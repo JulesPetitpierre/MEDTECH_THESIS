@@ -5,8 +5,6 @@ import shap
 import joblib
 import matplotlib.pyplot as plt
 
-from shap import TreeExplainer
-
 # ============================================================
 # PAGE CONFIGURATION
 # ============================================================
@@ -33,52 +31,55 @@ All insights are based on **SHAP values**, which estimate how much each feature 
 pipeline = joblib.load("safe_pipeline_xgb.joblib")
 df = pd.read_csv("ONLY_RELEVANT_M&A.csv")
 
-# Filter to test data post-2019
+# Ensure date features exist for transformation
 df["Date Announced (dateann)"] = pd.to_datetime(df["Date Announced (dateann)"], errors="coerce")
 df["ann_year"] = df["Date Announced (dateann)"].dt.year
-test_df = df[df["ann_year"] > 2019].copy()
+df["ann_month"] = df["Date Announced (dateann)"].dt.month
+df = df.drop(columns=["Date Announced (dateann)"], errors="ignore")
 
-# ============================================================
-# DATA CLEANING BEFORE TRANSFORM
-# ============================================================
+# Extract X for transformation
+X_raw = df.drop(columns=["Deal Status (status)"], errors="ignore")
 
-X_raw = test_df.drop(columns=["Deal Status (status)"], errors="ignore").copy()
-preprocessor = pipeline.named_steps["preprocessor"]
-
-# Align to trained column order
-expected_cols = preprocessor.feature_names_in_
+# Sanitize input to match training
+expected_cols = pipeline.named_steps["preprocessor"].feature_names_in_
 X_raw = X_raw.reindex(columns=expected_cols, fill_value=np.nan)
 
-# Fix types
 for col in X_raw.columns:
     if X_raw[col].dtype == "object":
-        X_raw[col] = X_raw[col].astype(str).replace("nan", "Missing").replace("None", "Missing")
+        X_raw[col] = X_raw[col].astype(str).replace("nan", "Missing")
     elif pd.api.types.is_numeric_dtype(X_raw[col]):
         X_raw[col] = pd.to_numeric(X_raw[col], errors="coerce").fillna(0)
     else:
         X_raw[col] = X_raw[col].astype(str).replace("nan", "Missing")
 
-X_raw = X_raw.fillna("Missing")
-
 try:
-    X_preprocessed = preprocessor.transform(X_raw)
+    X_preprocessed = pipeline.named_steps["preprocessor"].transform(X_raw)
 except Exception as e:
     st.error(f"❌ Preprocessing failed: {e}")
     st.stop()
 
-# Predict
-test_df["predicted_failure_prob"] = pipeline.predict_proba(X_raw)[:, 1]
-test_df["predicted_class"] = (test_df["predicted_failure_prob"] >= 0.60).astype(int)
+# ============================================================
+# COMPUTE SHAP VALUES
+# ============================================================
 
-# SHAP setup
 calibrated_clf = pipeline.named_steps["classifier"]
 xgb_model = calibrated_clf.calibrated_classifiers_[0].estimator
-explainer = TreeExplainer(xgb_model)
+explainer = shap.Explainer(xgb_model)
 shap_values = explainer(X_preprocessed)
-feature_names = preprocessor.get_feature_names_out()
 
 # ============================================================
-# GLOBAL FEATURE IMPORTANCE
+# LIMIT TO TOP 68 FEATURES (mean |SHAP|)
+# ============================================================
+
+shap_matrix = shap_values.values
+feature_names = pipeline.named_steps["preprocessor"].get_feature_names_out()
+mean_abs_shap = np.abs(shap_matrix).mean(axis=0)
+top_k = 68
+top_idx = np.argsort(mean_abs_shap)[-top_k:]
+limited_features = feature_names[top_idx]
+
+# ============================================================
+# GLOBAL FEATURE IMPORTANCE VISUALIZATION
 # ============================================================
 
 st.subheader("📊 Global SHAP Summary Plot (Customizable)")
@@ -90,19 +91,21 @@ with col1:
         options=["Mean |SHAP|", "Median SHAP", "SHAP Std Dev"]
     )
 with col2:
-    top_n = st.selectbox("Number of top features to display", options=[10, 20])
+    top_n = st.selectbox("Number of top features to display", options=[10, 20, 30, 50, 68], index=4)
 
-shap_matrix = shap_values.values
+# Compute importance vector
 if stat_choice == "Median SHAP":
     importance = np.median(np.abs(shap_matrix), axis=0)
 elif stat_choice == "SHAP Std Dev":
     importance = np.std(shap_matrix, axis=0)
 else:
-    importance = np.abs(shap_matrix).mean(axis=0)
+    importance = mean_abs_shap
 
+# Sort and select top features
 top_indices = np.argsort(importance)[-top_n:]
 sorted_idx = top_indices[np.argsort(importance[top_indices])]
 
+# Bar plot
 fig_bar, ax_bar = plt.subplots(figsize=(10, 6))
 ax_bar.barh(
     [feature_names[i] for i in sorted_idx],
@@ -114,15 +117,12 @@ ax_bar.set_title("Global SHAP Feature Importance")
 st.pyplot(fig_bar)
 
 # ============================================================
-# SHAP VALUE SCATTER PLOT
+# FEATURE-LEVEL EXPLANATION: SHAP VALUE SCATTER
 # ============================================================
 
 st.subheader("🎯 SHAP Value Scatter Plot by Feature")
 
-excluded = ["deal_no", "id", "master_deal_no"]
-dropdown_features = [f for f in feature_names if not any(ex in f.lower() for ex in excluded)]
-
-selected_feature = st.selectbox("Select a feature to explain", dropdown_features)
+selected_feature = st.selectbox("Select a feature to explain", sorted(limited_features))
 
 try:
     feature_idx = list(feature_names).index(selected_feature)
@@ -135,6 +135,7 @@ try:
 
     shap_vals = shap_values[:, feature_idx].values
 
+    # Plot
     st.markdown(
         f"### SHAP Scatter Plot for: <code style='color:limegreen'>{selected_feature}</code>",
         unsafe_allow_html=True

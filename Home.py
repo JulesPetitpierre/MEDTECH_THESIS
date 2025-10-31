@@ -71,22 +71,32 @@ with st.expander("Welcome. Click to read the introduction"):
 # ============================================================
 # LOAD MODEL AND DATA
 # ============================================================
+# ============================================================
+# LOAD MODEL AND DATA
+# ============================================================
 
+# Load data and extract year
 df = pd.read_csv("ONLY_RELEVANT_M&A.csv")
+df["Date Announced (dateann)"] = pd.to_datetime(df["Date Announced (dateann)"], errors="coerce")
+df["ann_year"] = df["Date Announced (dateann)"].dt.year
+
+# Temporal test split: only post-2019
+test_df = df[df["ann_year"] > 2019].copy()
+
+# Extract raw features and target
+X_raw = test_df.drop(columns=["Deal Status (status)"], errors="ignore")
+y = test_df["Deal Status (status)"]
+
+# Load model
 pipeline = joblib.load("safe_pipeline_xgb.joblib")
-
-# Extract raw features
-X_raw = df.drop(columns=["Deal Status (status)"], errors="ignore")
-y = df["Deal Status (status)"]
-
-# Preprocess + Predict
 preprocessor = pipeline.named_steps["preprocessor"]
 calibrated_clf = pipeline.named_steps["classifier"]
 xgb_model = calibrated_clf.calibrated_classifiers_[0].estimator
 
+# Preprocess and predict on test only
 X_preprocessed = preprocessor.transform(X_raw)
-df["predicted_failure_prob"] = pipeline.predict_proba(X_raw)[:, 1]
-df["predicted_class"] = (df["predicted_failure_prob"] >= 0.60).astype(int)
+test_df["predicted_failure_prob"] = pipeline.predict_proba(X_preprocessed)[:, 1]
+test_df["predicted_class"] = (test_df["predicted_failure_prob"] >= 0.60).astype(int)
 
 # Load human-readable feature names
 with open("columns.json") as f:

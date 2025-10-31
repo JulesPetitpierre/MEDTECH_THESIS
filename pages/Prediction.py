@@ -35,8 +35,7 @@ Prediction results are derived from the thesis:
 # LOAD MODEL AND PREPROCESSOR
 # ============================================================
 
-preprocessor = joblib.load("preprocessor_for_xgboost.joblib")
-model = joblib.load("calibrated_estimator_xgboost.joblib")
+pipeline = joblib.load("safe_pipeline_xgb.joblib")
 full_data = pd.read_csv("ONLY_RELEVANT_M&A.csv")
 
 # ============================================================
@@ -62,7 +61,7 @@ else:
     user_input = full_data.drop(columns=["Deal Status (status)"], errors="ignore").iloc[[0]]
     actual_status = None
 
-# Coerce numeric
+# Coerce numeric types
 user_input = user_input.copy()
 for col in user_input.columns:
     try:
@@ -74,12 +73,10 @@ for col in user_input.columns:
 # PREDICTION
 # ============================================================
 
-X_input = preprocessor.transform(user_input)
-failure_prob = model.predict_proba(X_input)[0][1] * 100
+X_input = pipeline.named_steps["preprocessor"].transform(user_input)
+failure_prob = pipeline.predict_proba(X_input)[0][1] * 100  # convert to %
 
-# Threshold (based on calibrated model)
-threshold = 60.0
-
+# Thresholds
 if failure_prob < 25:
     label = "✅ Very Low Risk of Failure"
     color = "#27ae60"
@@ -94,7 +91,7 @@ else:
     color = "#e74c3c"
 
 # ============================================================
-# RESULTS
+# DISPLAY RESULTS
 # ============================================================
 
 col1, col2 = st.columns([2, 1])
@@ -121,7 +118,10 @@ with col2:
 st.subheader("Feature Contributions to This Prediction (SHAP)")
 
 try:
-    explainer = shap.Explainer(model, feature_names=preprocessor.get_feature_names_out())
+    explainer = shap.Explainer(
+        pipeline.named_steps["classifier"],
+        feature_names=pipeline.named_steps["preprocessor"].get_feature_names_out()
+    )
     shap_values = explainer(X_input)
 
     shap.plots.waterfall(shap_values[0], max_display=10, show=False)

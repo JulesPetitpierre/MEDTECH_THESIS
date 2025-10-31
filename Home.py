@@ -74,7 +74,7 @@ with st.expander("Welcome. Click to read the introduction"):
 df = pd.read_csv("ONLY_RELEVANT_M&A.csv")
 
 # Load full pipeline (preprocessor + calibrated classifier)
-pipeline = joblib.load("calibrated_pipeline_xgboost.joblib")
+pipeline = joblib.load("safe_pipeline_xgb.joblib")
 
 # Extract X and y
 X_raw = df.drop(columns=["Deal Status (status)"], errors="ignore")

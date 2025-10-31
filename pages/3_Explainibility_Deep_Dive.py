@@ -25,23 +25,22 @@ All insights are based on **SHAP values**, which estimate how much each feature 
 """)
 
 # ============================================================
-# LOAD MODEL, PREPROCESSOR, AND DATA
+# LOAD MODEL AND DATA
 # ============================================================
 
-model = joblib.load("calibrated_estimator_xgboost.joblib")
-preprocessor = joblib.load("preprocessor_for_xgboost.joblib")
+pipeline = joblib.load("safe_pipeline_xgb.joblib")
 df = pd.read_csv("ONLY_RELEVANT_M&A.csv")
 
 # Prepare feature matrix
 X_raw = df.drop(columns=["Deal Status (status)"], errors="ignore")
-X_preprocessed = preprocessor.transform(X_raw)
-feature_names = preprocessor.get_feature_names_out()
+X_preprocessed = pipeline.named_steps["preprocessor"].transform(X_raw)
+feature_names = pipeline.named_steps["preprocessor"].get_feature_names_out()
 
 # ============================================================
 # COMPUTE SHAP VALUES
 # ============================================================
 
-explainer = shap.Explainer(model, feature_names=feature_names)
+explainer = shap.Explainer(pipeline.named_steps["classifier"], feature_names=feature_names)
 shap_values = explainer(X_preprocessed)
 
 # ============================================================

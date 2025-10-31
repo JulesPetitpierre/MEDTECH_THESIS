@@ -4,6 +4,7 @@ import numpy as np
 import shap
 import joblib
 import matplotlib.pyplot as plt
+from shap import TreeExplainer
 
 # ============================================================
 # PAGE CONFIGURATION
@@ -25,28 +26,37 @@ All insights are based on **SHAP values**, which estimate how much each feature 
 """)
 
 # ============================================================
-# LOAD MODEL AND DATA
+# LOAD MODEL AND TEST DATA
 # ============================================================
 
 pipeline = joblib.load("safe_pipeline_xgb.joblib")
 df = pd.read_csv("ONLY_RELEVANT_M&A.csv")
 
-# Prepare feature matrix
-X_raw = df.drop(columns=["Deal Status (status)"], errors="ignore")
-X_preprocessed = pipeline.named_steps["preprocessor"].transform(X_raw)
-feature_names = pipeline.named_steps["preprocessor"].get_feature_names_out()
+# Extract temporal test split: post-2019 only
+df["Date Announced (dateann)"] = pd.to_datetime(df["Date Announced (dateann)"], errors="coerce")
+df["ann_year"] = df["Date Announced (dateann)"].dt.year
+test_df = df[df["ann_year"] > 2019].copy()
+
+# Extract features
+X_raw = test_df.drop(columns=["Deal Status (status)"], errors="ignore")
+y = test_df["Deal Status (status)"]
+
+# Transform
+preprocessor = pipeline.named_steps["preprocessor"]
+X_preprocessed = preprocessor.transform(X_raw)
+feature_names = preprocessor.get_feature_names_out()
 
 # ============================================================
 # COMPUTE SHAP VALUES
 # ============================================================
 
-from shap import TreeExplainer
-
-# Get raw XGBoost model from the calibrated wrapper
+# Get the XGB model from inside the calibrated classifier
 calibrated_clf = pipeline.named_steps["classifier"]
-xgb_model = calibrated_clf.base_estimator  # This is the raw XGB model
+xgb_model = calibrated_clf.calibrated_classifiers_[0].estimator  # ✅ CORRECT
 
 explainer = TreeExplainer(xgb_model)
+shap_values = explainer(X_preprocessed)
+
 # ============================================================
 # GLOBAL FEATURE IMPORTANCE VISUALIZATION
 # ============================================================

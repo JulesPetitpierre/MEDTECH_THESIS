@@ -1,6 +1,7 @@
 import shap
 import streamlit as st
 import pandas as pd
+import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 import joblib
@@ -69,46 +70,49 @@ with st.expander("Welcome. Click to read the introduction"):
     """)
 
 # ============================================================
-# LOAD MODEL AND DATA
-# ============================================================
-# ============================================================
-# LOAD MODEL AND DATA
+# LOAD MODEL AND TEST DATA ONLY
 # ============================================================
 
-# Load data and extract year
+# Load dataset and extract year
 df = pd.read_csv("ONLY_RELEVANT_M&A.csv")
 df["Date Announced (dateann)"] = pd.to_datetime(df["Date Announced (dateann)"], errors="coerce")
 df["ann_year"] = df["Date Announced (dateann)"].dt.year
 
-# Temporal test split: only post-2019
+# Keep only post-2019 (test period)
 test_df = df[df["ann_year"] > 2019].copy()
 
-# Extract raw features and target
+# Extract target and features
+y = test_df["Deal Status (status)"].astype(int)
 X_raw = test_df.drop(columns=["Deal Status (status)"], errors="ignore")
-y = test_df["Deal Status (status)"]
 
-# Load model
+# Defensive fix: ensure categorical safety
+for col in X_raw.select_dtypes(include="object").columns:
+    X_raw[col] = X_raw[col].fillna("MISSING").astype(str)
+
+# Load model and components
 pipeline = joblib.load("safe_pipeline_xgb.joblib")
 preprocessor = pipeline.named_steps["preprocessor"]
 calibrated_clf = pipeline.named_steps["classifier"]
 xgb_model = calibrated_clf.calibrated_classifiers_[0].estimator
 
-# Preprocess and predict on test only
-X_preprocessed = preprocessor.transform(X_raw)
-test_df["predicted_failure_prob"] = pipeline.predict_proba(X_preprocessed)[:, 1]
+# Predict using pipeline (no manual transform)
+test_df["predicted_failure_prob"] = pipeline.predict_proba(X_raw)[:, 1]
 test_df["predicted_class"] = (test_df["predicted_failure_prob"] >= 0.60).astype(int)
 
-# Load human-readable feature names
+# Load readable feature names
 with open("columns.json") as f:
     readable_names = json.load(f)
 excluded = ["Unique Deal ID", "dateann", "Unique DEAL ID (master_deal_no)"]
 readable_names = [name for name in readable_names if name not in excluded]
 
 # ============================================================
-# SHAP EXPLAINER SETUP
+# SHAP EXPLAINER
 # ============================================================
 
+# Preprocess once for SHAP
+X_preprocessed = preprocessor.transform(X_raw)
 feature_names = preprocessor.get_feature_names_out()
+
 explainer = TreeExplainer(xgb_model)
 shap_values = explainer(X_preprocessed)
 
@@ -117,25 +121,27 @@ shap_values = explainer(X_preprocessed)
 # ============================================================
 
 st.sidebar.header("Choose a Specific Country")
-countries = sorted(df["Target Nation (tnation)"].dropna().unique())
+countries = sorted(test_df["Target Nation (tnation)"].dropna().unique())
 selected_country = st.sidebar.selectbox("Filter by Target Country", options=[None] + countries)
-filtered_df = df if selected_country is None else df[df["Target Nation (tnation)"] == selected_country]
+filtered_df = test_df if selected_country is None else test_df[test_df["Target Nation (tnation)"] == selected_country]
 
 # ============================================================
-# SUMMARY METRICS + SHAP VISUALIZATION
+# SUMMARY METRICS + 3D SHAP VISUALIZATION
 # ============================================================
 
 st.markdown("### Summary Statistics and Interactive SHAP Visualization")
 col1, col2 = st.columns([1, 1.5])
 
+# --- Left Column: Metrics ---
 with col1:
-    st.metric("Total Deals", len(filtered_df))
+    st.metric("Total Deals (Test Set)", len(filtered_df))
     st.metric("Actual Failures", int(filtered_df["Deal Status (status)"].sum()))
     st.metric("Predicted Failures (≥60%)", int(filtered_df["predicted_class"].sum()))
     st.metric("Avg. Predicted Risk (%)", round(filtered_df["predicted_failure_prob"].mean() * 100, 2))
     st.metric("Deals >75% Risk", int((filtered_df["predicted_failure_prob"] > 0.75).sum()))
     st.metric("Deals <25% Risk", int((filtered_df["predicted_failure_prob"] < 0.25).sum()))
 
+# --- Right Column: SHAP 3D ---
 with col2:
     st.markdown("#### 3D SHAP Feature Interaction Explorer")
 
@@ -152,7 +158,7 @@ with col2:
         idx_y = readable_names.index(feature2)
         idx_z = readable_names.index(shap_target)
 
-        # Handle sparse matrices
+        # Safe column extraction
         def safe_column(matrix, idx):
             col = matrix[:, idx]
             return col.toarray().flatten() if hasattr(col, "toarray") else np.array(col).flatten()

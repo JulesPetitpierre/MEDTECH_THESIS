@@ -5,6 +5,7 @@ import joblib
 import shap
 import matplotlib.pyplot as plt
 import geopandas as gpd
+from shap import TreeExplainer
 
 # ============================================================
 # PAGE CONFIGURATION
@@ -15,10 +16,6 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
-
-# ============================================================
-# PAGE TITLE AND INTRODUCTION
-# ============================================================
 
 st.title("MedTech M&A Deal Failure Prediction and Explainability")
 
@@ -32,7 +29,7 @@ Prediction results are derived from the thesis:
 """)
 
 # ============================================================
-# LOAD MODEL AND PREPROCESSOR
+# LOAD MODEL AND FULL DATA
 # ============================================================
 
 pipeline = joblib.load("safe_pipeline_xgb.joblib")
@@ -61,7 +58,7 @@ else:
     user_input = full_data.drop(columns=["Deal Status (status)"], errors="ignore").iloc[[0]]
     actual_status = None
 
-# Coerce numeric types
+# Coerce numeric types (failsafe for uploaded data)
 user_input = user_input.copy()
 for col in user_input.columns:
     try:
@@ -73,10 +70,9 @@ for col in user_input.columns:
 # PREDICTION
 # ============================================================
 
-# Do NOT transform manually — pass raw input directly
 failure_prob = pipeline.predict_proba(user_input)[0][1] * 100
 
-# Thresholds
+# Threshold mapping
 if failure_prob < 25:
     label = "✅ Very Low Risk of Failure"
     color = "#27ae60"
@@ -118,22 +114,19 @@ with col2:
 st.subheader("Feature Contributions to This Prediction (SHAP)")
 
 try:
-    from shap import TreeExplainer
-
-    # Extract the raw fitted XGBoost model from the CalibratedClassifierCV
-    calibrated_clf = pipeline.named_steps["classifier"]
-    xgb_model = calibrated_clf.base_estimator  # this is the actual XGBClassifier
-
-    # Prepare data for SHAP — preprocessed features only
+    # Get components from pipeline
     preprocessor = pipeline.named_steps["preprocessor"]
+    calibrated_clf = pipeline.named_steps["classifier"]
+    xgb_model = calibrated_clf.calibrated_classifiers_[0].estimator  # ✅ Correct access
+
+    # Transform input
     X_input_preprocessed = preprocessor.transform(user_input)
     feature_names = preprocessor.get_feature_names_out()
 
-    # Create SHAP explainer using the underlying XGB model
+    # SHAP
     explainer = TreeExplainer(xgb_model)
     shap_values = explainer(X_input_preprocessed)
 
-    # Plot local feature contributions for the selected deal
     shap.plots.waterfall(shap_values[0], max_display=10, show=False)
     fig = plt.gcf()
     st.pyplot(fig)

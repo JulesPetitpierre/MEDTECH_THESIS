@@ -68,24 +68,24 @@ with st.expander("Welcome. Click to read the introduction"):
     """)
 
 # ============================================================
-# LOAD MODEL, PREPROCESSOR, AND DATA
+# LOAD MODEL AND DATA
 # ============================================================
 
 df = pd.read_csv("ONLY_RELEVANT_M&A.csv")
 
-# Load preprocessor and calibrated model separately
-model = joblib.load("calibrated_estimator_xgboost.joblib")
+# Load full pipeline (preprocessor + calibrated classifier)
+pipeline = joblib.load("calibrated_pipeline_xgboost.joblib")
 
-# Prepare data
+# Extract X and y
 X_raw = df.drop(columns=["Deal Status (status)"], errors="ignore")
 y = df["Deal Status (status)"]
 
-# Apply preprocessing before prediction
-X_preprocessed = preprocessor.transform(X_raw)
-df["predicted_failure_prob"] = model.predict_proba(X_preprocessed)[:, 1]
-df["predicted_class"] = (df["predicted_failure_prob"] >= 0.60).astype(int)  # calibrated threshold
+# Preprocess and predict
+X_preprocessed = pipeline.named_steps["preprocessor"].transform(X_raw)
+df["predicted_failure_prob"] = pipeline.predict_proba(X_raw)[:, 1]
+df["predicted_class"] = (df["predicted_failure_prob"] >= 0.60).astype(int)
 
-# Load readable names
+# Load readable feature names
 with open("columns.json") as f:
     readable_names = json.load(f)
 
@@ -96,13 +96,15 @@ readable_names = [name for name in readable_names if name not in excluded]
 # SHAP EXPLAINER SETUP
 # ============================================================
 
-# Create SHAP explainer for the model
-feature_names = preprocessor.get_feature_names_out()
-explainer = shap.Explainer(model, feature_names=feature_names)
+# Use only classifier and preprocessed data for SHAP
+classifier = pipeline.named_steps["classifier"]
+feature_names = pipeline.named_steps["preprocessor"].get_feature_names_out()
+
+explainer = shap.Explainer(classifier, feature_names=feature_names)
 shap_values = explainer(X_preprocessed)
 
 # ============================================================
-# SIDEBAR FILTERS
+# SIDEBAR FILTER
 # ============================================================
 
 st.sidebar.header("Choose a Specific Country")
@@ -111,7 +113,7 @@ selected_country = st.sidebar.selectbox("Filter by Target Country", options=[Non
 filtered_df = df if selected_country is None else df[df["Target Nation (tnation)"] == selected_country]
 
 # ============================================================
-# SUMMARY METRICS + SHAP 3D VISUAL
+# SUMMARY METRICS AND 3D SHAP
 # ============================================================
 
 st.markdown("### Summary Statistics and Interactive SHAP Visualization")

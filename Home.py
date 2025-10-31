@@ -75,20 +75,20 @@ st.write("🔍 Data cleaning before transformation...")
 expected_cols = preprocessor.feature_names_in_
 X_raw = X_raw.reindex(columns=expected_cols, fill_value=np.nan)
 
-# Replace missing and unify types
-for col in X_raw.columns:
-    if X_raw[col].dtype == "object" or X_raw[col].dtype == "bool":
-        X_raw[col] = X_raw[col].astype(str).replace(["nan", "None", "NaT"], "Missing")
-    else:
-        X_raw[col] = X_raw[col].fillna(0)
-        try:
-            X_raw[col] = X_raw[col].astype(float)
-        except Exception:
-            X_raw[col] = 0.0
+# ============================================================
+# FINAL SANITIZER: Force all columns into clean dtypes
+# ============================================================
 
-# Debug check
-if X_raw.isna().sum().sum() > 0:
-    st.error("❌ Still contains NaNs after cleaning!")
+for col in X_raw.columns:
+    if X_raw[col].dtype == "object":
+        X_raw[col] = X_raw[col].astype(str).replace("nan", "Missing").replace("None", "Missing")
+    elif pd.api.types.is_numeric_dtype(X_raw[col]):
+        X_raw[col] = pd.to_numeric(X_raw[col], errors="coerce").fillna(0)
+    else:
+        X_raw[col] = X_raw[col].astype(str).replace("nan", "Missing")
+
+# Final failsafe: ensure full numeric fallback for unknowns
+X_raw = X_raw.fillna("Missing")
 
 try:
     X_preprocessed = preprocessor.transform(X_raw)

@@ -68,12 +68,15 @@ explainer = shap.Explainer(xgb_model)
 shap_values = explainer(X_preprocessed)
 feature_names = pipeline.named_steps["preprocessor"].get_feature_names_out()
 
-# Limit dropdown features to only a clean subset
-displayable_features = [f for f in feature_names if (
-    "Date Announced (dateann)" in f or
-    "Target Nation (tnation)" in f or
-    "Target Nation Code (tnationcode)" in f
-)]
+# ============================================================
+# EXCLUDE NOISY CATEGORIES FROM DROPDOWN
+# ============================================================
+
+excluded_keywords = ["dateann", "tnation", "tnationcode"]
+displayable_features = [
+    f for f in feature_names
+    if not any(keyword in f.lower() for keyword in excluded_keywords)
+]
 
 # ============================================================
 # GLOBAL SHAP BAR CHART

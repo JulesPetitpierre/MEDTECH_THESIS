@@ -7,19 +7,25 @@ import joblib
 import json
 import plotly.express as px
 
+# ============================================================
+# PAGE CONFIGURATION
+# ============================================================
 
 st.set_page_config(
-    page_title="MedTech M&A Failure Predictor",  # Title on browser tab
-    page_icon="🧬",  # Can be an emoji, or see Option 2 for a custom image
+    page_title="MedTech M&A Failure Predictor",
+    page_icon="🧬",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# Custom styling
+# ============================================================
+# STYLING
+# ============================================================
+
 st.markdown("""
     <link href="https://fonts.googleapis.com/css2?family=Lato&display=swap" rel="stylesheet">
     <style>
-    html, body, [class*="css"]  {
+    html, body, [class*="css"] {
         font-family: 'Lato', sans-serif;
         background-color: #0B1A28;
         color: white;
@@ -32,83 +38,96 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Styling
 plt.style.use("dark_background")
 sns.set_style("darkgrid")
 sns.set_palette("dark")
 
 st.title("MedTech M&A Failure Prediction Summary")
 
+# ============================================================
+# INTRODUCTION SECTION
+# ============================================================
+
 with st.expander("Welcome. Click to read the introduction"):
     st.markdown("""
-    This application represents an **applied summarizing tool of my tuned XGBoost Machine Learning Model and its results** developed as part of my Bachelor's thesis:
+    This application represents an **applied summarizing tool of my tuned and calibrated XGBoost model** developed as part of my Bachelor's thesis:
 
-    **"Decoding Mergers & Acquisitions Failures: Exploring the Complex Landscape of MedTech M&A Setbacks Through Advanced Risk Modeling Techniques"**
+    **"Exploring the Complex Landscape of MedTech M&A Setbacks Using Machine Learning"**
 
     ---
     **Defining Failure in This Context**  
-    In this research, failure refers specifically to **withdrawn M&A transactions** — deals that are formally announced but ultimately not completed.  
-
-    Such withdrawals, whether driven by internal misalignment, regulatory barriers, or red flags uncovered during due diligence, often represent significant hidden costs.
+    Failure refers to **withdrawn or terminated transactions** — deals that are publicly announced but not completed. These events often result from misaligned expectations, due diligence issues, or regulatory constraints.
 
     ---
     **Purpose of This Tool**  
-    This interactive application enables users to:
-    - Generate a **predicted risk score** for deal failure  
-    - Understand **feature contributions** using SHAP explainability  
-    - Conduct **scenario testing** and evaluate risk across a portfolio  
+    - Generate a **predicted probability** of deal failure  
+    - Understand **feature-level contributions** via SHAP values  
+    - Conduct **interactive risk analysis** across transactions  
 
-    Designed with ambition and practical impact in mind, this tool connects academic modeling with real-world decision-making in M&A.
-
-    ---
-    **Note:** This is an early version of the application and will be further refined in the coming days with enhanced visuals and extended functionality.
+    The tool translates the thesis results into an interpretable, real-world application bridging academic insight and managerial decision-making.
     """)
 
-# Load model and data
+# ============================================================
+# LOAD MODEL, PREPROCESSOR, AND DATA
+# ============================================================
+
 df = pd.read_csv("ONLY_RELEVANT_M&A.csv")
-model = joblib.load("xgb_pipe.pkl")
-X = df.drop(columns=["Deal Status (status)"])
+
+# Load preprocessor and calibrated model separately
+preprocessor = joblib.load("preprocessor_for_xgboost.joblib")
+model = joblib.load("calibrated_estimator_xgboost.joblib")
+
+# Prepare data
+X_raw = df.drop(columns=["Deal Status (status)"], errors="ignore")
 y = df["Deal Status (status)"]
-df["predicted_failure_prob"] = model.predict_proba(X)[:, 1]
-df["predicted_class"] = (df["predicted_failure_prob"] >= 0.5).astype(int)
+
+# Apply preprocessing before prediction
+X_preprocessed = preprocessor.transform(X_raw)
+df["predicted_failure_prob"] = model.predict_proba(X_preprocessed)[:, 1]
+df["predicted_class"] = (df["predicted_failure_prob"] >= 0.60).astype(int)  # calibrated threshold
 
 # Load readable names
 with open("columns.json") as f:
     readable_names = json.load(f)
 
-# Remove non-informative features like Unique Deal ID
 excluded = ["Unique Deal ID", "dateann", "Unique DEAL ID (master_deal_no)"]
 readable_names = [name for name in readable_names if name not in excluded]
 
-# SHAP
-X_raw = df.drop(columns=["Deal Status (status)"], errors="ignore")
-X_preprocessed = model.named_steps["preprocessor"].transform(X_raw)
-feature_names = model.named_steps["preprocessor"].get_feature_names_out()
-explainer = shap.Explainer(model.named_steps["classifier"], feature_names=feature_names)
+# ============================================================
+# SHAP EXPLAINER SETUP
+# ============================================================
+
+# Create SHAP explainer for the model
+feature_names = preprocessor.get_feature_names_out()
+explainer = shap.Explainer(model, feature_names=feature_names)
 shap_values = explainer(X_preprocessed)
 
-# Sidebar filter
+# ============================================================
+# SIDEBAR FILTERS
+# ============================================================
+
 st.sidebar.header("Choose a Specific Country")
 countries = sorted(df["Target Nation (tnation)"].dropna().unique())
-selected_country = st.sidebar.selectbox("Country look of", options=[None] + countries)
+selected_country = st.sidebar.selectbox("Filter by Target Country", options=[None] + countries)
 filtered_df = df if selected_country is None else df[df["Target Nation (tnation)"] == selected_country]
 
-# Layout block
-st.markdown("### Summary Statistics and 3D SHAP Visual")
+# ============================================================
+# SUMMARY METRICS + SHAP 3D VISUAL
+# ============================================================
+
+st.markdown("### Summary Statistics and Interactive SHAP Visualization")
 col1, col2 = st.columns([1, 1.5])
 
-# Summary metrics
 with col1:
     st.metric("Total Deals", len(filtered_df))
-    st.metric("Actual Failures", filtered_df["Deal Status (status)"].sum())
-    st.metric("Predicted Failures (≥50%)", filtered_df["predicted_class"].sum())
+    st.metric("Actual Failures", int(filtered_df["Deal Status (status)"].sum()))
+    st.metric("Predicted Failures (≥60%)", int(filtered_df["predicted_class"].sum()))
     st.metric("Avg. Predicted Risk (%)", round(filtered_df["predicted_failure_prob"].mean() * 100, 2))
-    st.metric("Deals with >75% Risk", (filtered_df["predicted_failure_prob"] > 0.75).sum())
-    st.metric("Deals with <25% Risk", (filtered_df["predicted_failure_prob"] < 0.25).sum())
+    st.metric("Deals >75% Risk", int((filtered_df["predicted_failure_prob"] > 0.75).sum()))
+    st.metric("Deals <25% Risk", int((filtered_df["predicted_failure_prob"] < 0.25).sum()))
 
-# SHAP Feature selection and plot
 with col2:
-    st.markdown("#### Interactive 3D SHAP Plot")
+    st.markdown("#### 3D SHAP Feature Interaction Explorer")
 
     col3, col4, col5 = st.columns(3)
     with col3:
@@ -123,8 +142,8 @@ with col2:
         idx_y = readable_names.index(feature2)
         idx_z = readable_names.index(shap_target)
 
-        x_vals = X_preprocessed[:, idx_x].toarray().flatten() if hasattr(X_preprocessed, "toarray") else X_preprocessed[:, idx_x]
-        y_vals = X_preprocessed[:, idx_y].toarray().flatten() if hasattr(X_preprocessed, "toarray") else X_preprocessed[:, idx_y]
+        x_vals = X_preprocessed[:, idx_x]
+        y_vals = X_preprocessed[:, idx_y]
         z_vals = shap_values[:, idx_z].values.flatten()
 
         fig = px.scatter_3d(
@@ -139,4 +158,4 @@ with col2:
         st.plotly_chart(fig, use_container_width=True)
 
     except Exception as e:
-        st.error(f"Could not generate 3D plot: {e}")
+        st.error(f"Could not generate SHAP plot: {e}")

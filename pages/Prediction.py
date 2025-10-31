@@ -6,129 +6,90 @@ import shap
 import matplotlib.pyplot as plt
 import geopandas as gpd
 
-# Page title
-st.title("Explore the MedTech M&A Deal failures and a ML Model explain them")
-st.markdown("This Machine Learning tool predicts the **failure probability** of MedTech M&A deals using an interpretable XGBoost model.")
+# ============================================================
+# PAGE TITLE AND INTRO
+# ============================================================
 
-with st.expander("SHAP Feature Index Reference"):
-    st.markdown("""
-    | Index | Feature Name |
-    |-------|--------------|
-    | 0     | Date Announced (dateann) |
-    | 1     | Unique DEAL ID (master_deal_no) |
-    | 2     | Target Name (tmanames) |
-    | 3     | Acquiror Name (amanames) |
-    | 4     | Acquiror is a Financial Sponsor (Yes/No Flag) (afinancial) |
-    | 5     | Acquiror is a Leverage Buyout Firm (albofirm) |
-    | 6     | Acquiror is a Limited Partnership Flag (alp) |
-    | 7     | Deal Attitude (attitude) |
-    | 8     | Deals is a Divestiture Flag (divest) |
-    | 9     | Division (division) |
-    | 10    | Form of transaction (form) |
-    | 11    | Percentage of consideration paid in cash (pct_cash) |
-    | 12    | Percentage of consideration paid in other then cash or stock (p) |
-    | 13    | Percentage of consideration paid in stock (pct_stk) |
-    | 14    | Percentage of consideration which is unknown (pct_unknown) |
-    | 15    | Percentage of Shares Sought (psought) |
-    | 16    | Percentage of Shares Acquiror is Seeking to Own After Transacti |
-    | 17    | Related Deals Flag (rd) |
-    | 18    | Deal is a Repurchase Flag (repurch) |
-    | 19    | Source of Funds Borrowing Flag (sfbor) |
-    | 20    | Source of Funds Common Stock Issue Flag (sfcom) |
-    | 21    | Financing via Internal Corporate Funds Flag (sfcorp) |
-    | 22    | Financing via Debt Securities Flag (sfdebt) |
-    | 23    | Financing via Line of Credit Flag (sflc) |
-    | 24    | Ranking Value incl Net Debt of Target (USD Mil) (rankval) |
-    | 25    | TR Acquiror Industry Description (atf_mid_desc) |
-    | 26    | TR Target Industry Description (ttf_mid_desc) |
-    | 27    | TR Acquiror Macro Description (atf_macro_desc) |
-    | 28    | TR Target Macro Description (ttf_macro_desc) |
-    | 29    | Acquiror Nation (anation) |
-    | 30    | Acquiror Nation Code (anationcode) |
-    | 31    | Target Nation (tnation) |
-    | 32    | Target Nation Code (tnationcode) |
-    | 33    | Target Public Status (tpublic) |
-    | 34    | Acquiror Public Status (apublic) |
-    | 35    | deal_value |
-    | 36    | Enterprise Value ($mil) (entval) |
-    | 37    | Equity Value ($mil) (eqval) |
-    | 38    | Price Per Share (pr) |
-    | 39    | Target Sales LTM ($mil) (salesltm) |
-    | 40    | Target EBIT LTM ($mil) (ebitltm) |
-    | 41    | Target Pre-Tax Income LTM ($mil) (ptincltm) |
-    | 42    | Target Net Income LTM ($mil) (niltm) |
-    | 43    | Target Net Assets ($mil) (netass) |
-    | 44    | Target Total Assets ($mil) (tass) |
-    | 45    | Target Cash Flow LTM ($mil) (cashflow) |
-    | 46    | Target Book Value ($mil) (bookvalue) |
-    | 47    | Target Common Equity ($mil) (commonequity) |
-    | 48    | Target Earnings Per Share ($mil) (epsltm) |
-    | 49    | Target Closing Stock Price 1 day Prior to Deal Announcement Day |
-    | 50    | Target Closing Stock Price 1 week Prior to Deal Announcement Da |
-    | 51    | Target Closing Stock Price 4 weeks Prior to Deal Announcement D |
-    | 52    | Consideration Offered (considoff) |
-    | 53    | Consideration Sought (considsought) |
-    | 54    | Vix |
-    | 55    | Interest rates |
-    | 56    | GDP growth |
-    | 57    | Healthcare growth |
-    | 58    | Covid19 |
-    | 59    | dateann |
-    """)
+st.title("MedTech M&A Deal Failure Prediction and Explainability")
+st.markdown("""
+This page allows you to explore individual deal predictions from the calibrated **XGBoost classifier** 
+used in the thesis *“Exploring the Complex Landscape of MedTech M&A Setbacks Using Machine Learning.”*  
+The model provides both a **failure probability** and a **transparent SHAP explanation** for each case.
+""")
 
-# --- Load trained model and data ---
-model = joblib.load("xgb_pipe.pkl")
+# ============================================================
+# LOAD MODEL AND PREPROCESSOR
+# ============================================================
+
+# Load the preprocessor and model separately (from joblib files)
+preprocessor = joblib.load("preprocessor_for_xgboost.joblib")
+model = joblib.load("calibrated_estimator_xgboost.joblib")
+
+# Load full dataset for context
 full_data = pd.read_csv("ONLY_RELEVANT_M&A.csv")
-features = model.named_steps["preprocessor"].get_feature_names_out()
 
-# --- Let user select a deal by Acquiror ---
+# ============================================================
+# DEAL SELECTION AND FILE UPLOAD
+# ============================================================
+
+st.sidebar.header("Deal Selection")
+
 acquiror_list = full_data["Target Name (tmanames)"].dropna().unique().tolist()
-selected_acquiror = st.selectbox("Select a Deal by Target", acquiror_list)
+selected_acquiror = st.sidebar.selectbox("Select a Deal by Target", acquiror_list)
 
-# --- Upload new data ---
-st.sidebar.header("Optional: Upload New Deal")
-uploaded_file = st.sidebar.file_uploader("Upload deal data as CSV", type=["csv"])
+st.sidebar.markdown("---")
+uploaded_file = st.sidebar.file_uploader("Or upload new deal data as CSV", type=["csv"])
 
-# --- Determine input data ---
+# Determine input data source
 if uploaded_file:
     user_input = pd.read_csv(uploaded_file)
 elif selected_acquiror:
     selected_row = full_data[full_data["Target Name (tmanames)"] == selected_acquiror].iloc[[0]]
-    user_input = selected_row.drop(columns=["deal_status"], errors="ignore")
+    user_input = selected_row.drop(columns=["Deal Status (status)"], errors="ignore")
 else:
-    default_input = full_data.drop(columns=["deal_status"], errors="ignore").iloc[[0]]
-    user_input = default_input
+    user_input = full_data.drop(columns=["Deal Status (status)"], errors="ignore").iloc[[0]]
 
-# Coerce to correct types
+# Coerce numeric types safely
 user_input = user_input.copy()
 for col in user_input.columns:
     try:
         user_input[col] = pd.to_numeric(user_input[col])
-    except:
+    except Exception:
         pass
 
-# --- Prediction ---
-probability = model.predict_proba(user_input)[0][1] * 100
+# ============================================================
+# PREDICTION PIPELINE
+# ============================================================
 
-# Color + Label (corrected logic)
+# Apply preprocessing, then predict with calibrated XGBoost model
+X_input = preprocessor.transform(user_input)
+probability = model.predict_proba(X_input)[0][1] * 100  # % probability of failure
+
+# Threshold based on thesis calibration
+threshold = 0.60
+
+# Determine label and color
 if probability < 25:
-    bar_color = "#27ae60"   # green
+    bar_color = "#27ae60"
     label = "✅ Very Low Risk of Failure"
 elif probability < 50:
-    bar_color = "#2ecc71"   # light green
+    bar_color = "#2ecc71"
     label = "🟢 Likely to Succeed"
 elif probability < 75:
-    bar_color = "#e67e22"   # orange
+    bar_color = "#e67e22"
     label = "🟠 Moderate Risk"
 else:
-    bar_color = "#e74c3c"   # red
+    bar_color = "#e74c3c"
     label = "🔴 High Risk of Failure"
 
-# --- Display Prediction & Actual Outcome Side by Side ---
-left_col, right_col = st.columns([2, 1])  # Wider left for prediction
+# ============================================================
+# DISPLAY RESULTS
+# ============================================================
+
+left_col, right_col = st.columns([2, 1])
 
 with left_col:
-    st.subheader("Prediction percentage")
+    st.subheader("Predicted Failure Probability")
     st.markdown(
         f"<h2 style='color:{bar_color};'>Predicted Failure Risk: {probability:.2f}%</h2>",
         unsafe_allow_html=True
@@ -136,65 +97,55 @@ with left_col:
     st.markdown(f"**{label}**")
 
 with right_col:
-    if uploaded_file is None and "Deal Status (status)" in selected_row.columns:
+    if uploaded_file is None and "Deal Status (status)" in full_data.columns:
         actual_status = selected_row["Deal Status (status)"].values[0]
-
         if actual_status == 1:
-            st.markdown(
-                "<h4 style='color:#e74c3c;'>🟥 Actual Outcome: Deal Withdrawn</h4>",
-                unsafe_allow_html=True
-            )
+            st.markdown("<h4 style='color:#e74c3c;'>🟥 Actual Outcome: Deal Withdrawn</h4>", unsafe_allow_html=True)
         else:
-            st.markdown(
-                "<h4 style='color:#27ae60;'>🟩 Actual Outcome: Deal Completed</h4>",
-                unsafe_allow_html=True
-            )
+            st.markdown("<h4 style='color:#27ae60;'>🟩 Actual Outcome: Deal Completed</h4>", unsafe_allow_html=True)
 
-# --- SHAP Explanation ---
-st.subheader("Explanation (SHAP), aka the power of variables in the development of the percentage points")
+# ============================================================
+# SHAP EXPLANATION
+# ============================================================
 
-# Build explainer from classifier step
-explainer = shap.Explainer(model.named_steps["classifier"])
+st.subheader("SHAP Explanation — Feature Contributions to Predicted Risk")
 
-# Preprocess user input
-preprocessed_input = model.named_steps["preprocessor"].transform(user_input)
+# Compute SHAP values
+feature_names = preprocessor.get_feature_names_out()
+explainer = shap.Explainer(model, feature_names=feature_names)
+shap_values = explainer(X_input)
 
-# Get SHAP values
-shap_values = explainer(preprocessed_input)
-
-# Plot SHAP waterfall
-shap.plots.waterfall(shap_values[0], max_display=10, show=False)
-fig = plt.gcf()
-st.pyplot(fig)
-
-# --- Map Plot ---
-st.subheader("Company Locations")
+# Waterfall plot for local explanation
 try:
-    # Load local shapefile
-    world = gpd.read_file("Countries/ne_110m_admin_0_countries.shp")
+    shap.plots.waterfall(shap_values[0], max_display=10, show=False)
+    fig = plt.gcf()
+    st.pyplot(fig)
+except Exception as e:
+    st.warning(f"Could not generate SHAP plot: {e}")
 
+# ============================================================
+# MAP VISUALISATION
+# ============================================================
+
+st.subheader("Acquiror and Target Country Map")
+
+try:
+    world = gpd.read_file("Countries/ne_110m_admin_0_countries.shp")
     acq_country = user_input["Acquiror Nation (anation)"].values[0]
     tgt_country = user_input["Target Nation (tnation)"].values[0]
 
-    country_data = world[
-        (world["NAME"] == acq_country) | (world["NAME"] == tgt_country)
-    ]
+    country_data = world[(world["NAME"] == acq_country) | (world["NAME"] == tgt_country)]
 
     if not country_data.empty:
         fig, ax = plt.subplots(figsize=(10, 6))
-        world.boundary.plot(ax=ax, linewidth=0.8, edgecolor='black')
+        world.boundary.plot(ax=ax, linewidth=0.8, edgecolor='gray')
         country_data.plot(ax=ax, color="skyblue", edgecolor='black')
 
-        # Add the label in the bottom-left corner of the figure
-        fig.text(0.01, 0.01,
-                 f"Acquiror: {acq_country}\nTarget: {tgt_country}",
-                 fontsize=10, ha='left', va='bottom')
-
-        ax.set_title("Acquiror and Target Locations")
+        fig.text(0.01, 0.01, f"Acquiror: {acq_country}\nTarget: {tgt_country}", fontsize=10, ha='left', va='bottom')
+        ax.set_title("Acquiror and Target Locations", fontsize=12)
         st.pyplot(fig)
-
     else:
-        st.info("Could not match countries for map. Please ensure exact country names in 'Acquiror Nation (anation)' and 'Target Nation (tnation)'.")
-        
+        st.info("Could not match countries for map — please verify country name consistency.")
+
 except Exception as e:
     st.warning(f"Map could not be rendered: {e}")

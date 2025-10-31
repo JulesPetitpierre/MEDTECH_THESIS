@@ -73,8 +73,8 @@ for col in user_input.columns:
 # PREDICTION
 # ============================================================
 
-X_input = pipeline.named_steps["preprocessor"].transform(user_input)
-failure_prob = pipeline.predict_proba(X_input)[0][1] * 100  # convert to %
+# Do NOT transform manually — pass raw input directly
+failure_prob = pipeline.predict_proba(user_input)[0][1] * 100
 
 # Thresholds
 if failure_prob < 25:
@@ -118,15 +118,26 @@ with col2:
 st.subheader("Feature Contributions to This Prediction (SHAP)")
 
 try:
-    explainer = shap.Explainer(
-        pipeline.named_steps["classifier"],
-        feature_names=pipeline.named_steps["preprocessor"].get_feature_names_out()
-    )
-    shap_values = explainer(X_input)
+    from shap import TreeExplainer
 
+    # Extract the raw fitted XGBoost model from the CalibratedClassifierCV
+    calibrated_clf = pipeline.named_steps["classifier"]
+    xgb_model = calibrated_clf.base_estimator  # this is the actual XGBClassifier
+
+    # Prepare data for SHAP — preprocessed features only
+    preprocessor = pipeline.named_steps["preprocessor"]
+    X_input_preprocessed = preprocessor.transform(user_input)
+    feature_names = preprocessor.get_feature_names_out()
+
+    # Create SHAP explainer using the underlying XGB model
+    explainer = TreeExplainer(xgb_model)
+    shap_values = explainer(X_input_preprocessed)
+
+    # Plot local feature contributions for the selected deal
     shap.plots.waterfall(shap_values[0], max_display=10, show=False)
     fig = plt.gcf()
     st.pyplot(fig)
+
 except Exception as e:
     st.warning(f"SHAP plot could not be generated: {e}")
 

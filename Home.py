@@ -158,9 +158,9 @@ with col2:
         z_vals = shap_values[:, idx_z].values.flatten()
 
         fig = px.scatter_3d(
-            x=x_vals,
-            y=y_vals,
-            z=z_vals,
+            x_vals = X_preprocessed[:, idx_x].toarray().flatten()
+            y_vals = X_preprocessed[:, idx_y].toarray().flatten()
+            z_vals = shap_values[:, idx_z].values.flatten()
             color=z_vals,
             labels={"x": feature1, "y": feature2, "z": f"SHAP: {shap_target}"},
             opacity=0.7

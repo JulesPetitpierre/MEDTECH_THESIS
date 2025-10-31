@@ -40,9 +40,13 @@ feature_names = pipeline.named_steps["preprocessor"].get_feature_names_out()
 # COMPUTE SHAP VALUES
 # ============================================================
 
-explainer = shap.Explainer(pipeline.named_steps["classifier"], feature_names=feature_names)
-shap_values = explainer(X_preprocessed)
+from shap import TreeExplainer
 
+# Get raw XGBoost model from the calibrated wrapper
+calibrated_clf = pipeline.named_steps["classifier"]
+xgb_model = calibrated_clf.base_estimator  # This is the raw XGB model
+
+explainer = TreeExplainer(xgb_model)
 # ============================================================
 # GLOBAL FEATURE IMPORTANCE VISUALIZATION
 # ============================================================

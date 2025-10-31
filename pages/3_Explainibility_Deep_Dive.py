@@ -1,12 +1,10 @@
-import shap
 import streamlit as st
 import pandas as pd
-import matplotlib.pyplot as plt
-import seaborn as sns
-import joblib
-import json
 import numpy as np
-import plotly.express as px
+import shap
+import joblib
+import matplotlib.pyplot as plt
+
 from shap import TreeExplainer
 
 # ============================================================
@@ -14,182 +12,140 @@ from shap import TreeExplainer
 # ============================================================
 
 st.set_page_config(
-    page_title="MedTech M&A Failure Predictor",
-    page_icon="🧬",
+    page_title="Explainability Deep Dive",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# ============================================================
-# STYLING
-# ============================================================
+st.title("🔬 Explainability Deep Dive: SHAP-Based Insights")
 
 st.markdown("""
-    <link href="https://fonts.googleapis.com/css2?family=Lato&display=swap" rel="stylesheet">
-    <style>
-    html, body, [class*="css"] {
-        font-family: 'Lato', sans-serif;
-        background-color: #0B1A28;
-        color: white;
-    }
-    footer {visibility: hidden;}
-    .block-container {
-        padding-top: 2rem;
-        padding-bottom: 2rem;
-    }
-    </style>
-""", unsafe_allow_html=True)
+This section enables you to explore **global and feature-level explanations** of deal failure predictions 
+from the calibrated XGBoost model used in the thesis.  
 
-plt.style.use("dark_background")
-sns.set_style("darkgrid")
-sns.set_palette("dark")
-
-st.title("MedTech M&A Failure Prediction Summary")
-
-# ============================================================
-# INTRODUCTION SECTION
-# ============================================================
-
-with st.expander("Welcome. Click to read the introduction"):
-    st.markdown("""
-    This application represents an **applied summarizing tool of my tuned and calibrated XGBoost model** developed as part of my Bachelor's thesis:
-
-    **"Exploring the Complex Landscape of MedTech M&A Setbacks Using Machine Learning"**
-
-    ---
-    **Defining Failure in This Context**  
-    Failure refers to **withdrawn or terminated transactions** — deals that are publicly announced but not completed. These events often result from misaligned expectations, due diligence issues, or regulatory constraints.
-
-    ---
-    **Purpose of This Tool**  
-    - Generate a **predicted probability** of deal failure  
-    - Understand **feature-level contributions** via SHAP values  
-    - Conduct **interactive risk analysis** across transactions  
-
-    The tool translates the thesis results into an interpretable, real-world application bridging academic insight and managerial decision-making.
-    """)
+All insights are based on **SHAP values**, which estimate how much each feature contributed to the predicted probability of failure.
+""")
 
 # ============================================================
 # LOAD MODEL AND DATA
 # ============================================================
 
 pipeline = joblib.load("safe_pipeline_xgb.joblib")
-
-# Load and prepare data
 df = pd.read_csv("ONLY_RELEVANT_M&A.csv")
+
+# Filter to test data post-2019
 df["Date Announced (dateann)"] = pd.to_datetime(df["Date Announced (dateann)"], errors="coerce")
 df["ann_year"] = df["Date Announced (dateann)"].dt.year
-
-# Filter test set (2020+)
 test_df = df[df["ann_year"] > 2019].copy()
 
-# Extract features + target
-X_raw = test_df.drop(columns=["Deal Status (status)"], errors="ignore")
-y = test_df["Deal Status (status)"]
-
 # ============================================================
-# CRITICAL FIX: CLEAN DATA FOR TRANSFORMER
+# DATA CLEANING BEFORE TRANSFORM
 # ============================================================
 
-# Keep only columns used during training
+X_raw = test_df.drop(columns=["Deal Status (status)"], errors="ignore").copy()
 preprocessor = pipeline.named_steps["preprocessor"]
-trained_columns = preprocessor.feature_names_in_
 
-X_raw = X_raw[[col for col in trained_columns if col in X_raw.columns]]
+# Align to trained column order
+expected_cols = preprocessor.feature_names_in_
+X_raw = X_raw.reindex(columns=expected_cols, fill_value=np.nan)
 
-# Replace missing and cast categorical to string
+# Fix types
 for col in X_raw.columns:
     if X_raw[col].dtype == "object":
-        X_raw[col] = X_raw[col].fillna("Missing").astype(str)
+        X_raw[col] = X_raw[col].astype(str).replace("nan", "Missing").replace("None", "Missing")
+    elif pd.api.types.is_numeric_dtype(X_raw[col]):
+        X_raw[col] = pd.to_numeric(X_raw[col], errors="coerce").fillna(0)
     else:
-        X_raw[col] = X_raw[col].fillna(0)
+        X_raw[col] = X_raw[col].astype(str).replace("nan", "Missing")
 
-# ============================================================
-# PREDICTION
-# ============================================================
+X_raw = X_raw.fillna("Missing")
 
-# Predict safely
+try:
+    X_preprocessed = preprocessor.transform(X_raw)
+except Exception as e:
+    st.error(f"❌ Preprocessing failed: {e}")
+    st.stop()
+
+# Predict
 test_df["predicted_failure_prob"] = pipeline.predict_proba(X_raw)[:, 1]
 test_df["predicted_class"] = (test_df["predicted_failure_prob"] >= 0.60).astype(int)
 
-# ============================================================
-# LOAD HUMAN-READABLE NAMES
-# ============================================================
-
-with open("columns.json") as f:
-    readable_names = json.load(f)
-excluded = ["Unique Deal ID", "dateann", "Unique DEAL ID (master_deal_no)"]
-readable_names = [name for name in readable_names if name not in excluded]
-
-# ============================================================
-# SHAP EXPLAINER SETUP
-# ============================================================
-
+# SHAP setup
 calibrated_clf = pipeline.named_steps["classifier"]
 xgb_model = calibrated_clf.calibrated_classifiers_[0].estimator
-
-X_preprocessed = preprocessor.transform(X_raw)
 explainer = TreeExplainer(xgb_model)
 shap_values = explainer(X_preprocessed)
+feature_names = preprocessor.get_feature_names_out()
 
 # ============================================================
-# SIDEBAR FILTER
+# GLOBAL FEATURE IMPORTANCE
 # ============================================================
 
-st.sidebar.header("Choose a Specific Country")
-countries = sorted(test_df["Target Nation (tnation)"].dropna().unique())
-selected_country = st.sidebar.selectbox("Filter by Target Country", options=[None] + countries)
-filtered_df = test_df if selected_country is None else test_df[test_df["Target Nation (tnation)"] == selected_country]
+st.subheader("📊 Global SHAP Summary Plot (Customizable)")
 
-# ============================================================
-# SUMMARY + SHAP VISUAL
-# ============================================================
-
-st.markdown("### Summary Statistics and Interactive SHAP Visualization")
-col1, col2 = st.columns([1, 1.5])
-
+col1, col2 = st.columns(2)
 with col1:
-    st.metric("Total Deals (Test)", len(filtered_df))
-    st.metric("Actual Failures", int(filtered_df["Deal Status (status)"].sum()))
-    st.metric("Predicted Failures (≥60%)", int(filtered_df["predicted_class"].sum()))
-    st.metric("Avg. Predicted Risk (%)", round(filtered_df["predicted_failure_prob"].mean() * 100, 2))
-    st.metric("Deals >75% Risk", int((filtered_df["predicted_failure_prob"] > 0.75).sum()))
-    st.metric("Deals <25% Risk", int((filtered_df["predicted_failure_prob"] < 0.25).sum()))
-
+    stat_choice = st.selectbox(
+        "Select importance statistic",
+        options=["Mean |SHAP|", "Median SHAP", "SHAP Std Dev"]
+    )
 with col2:
-    st.markdown("#### 3D SHAP Feature Interaction Explorer")
+    top_n = st.selectbox("Number of top features to display", options=[10, 20])
 
-    col3, col4, col5 = st.columns(3)
-    with col3:
-        feature1 = st.selectbox("X-axis", readable_names, key="shap3d_x")
-    with col4:
-        feature2 = st.selectbox("Y-axis", readable_names, key="shap3d_y")
-    with col5:
-        shap_target = st.selectbox("Z-axis (SHAP of)", readable_names, key="shap3d_z")
+shap_matrix = shap_values.values
+if stat_choice == "Median SHAP":
+    importance = np.median(np.abs(shap_matrix), axis=0)
+elif stat_choice == "SHAP Std Dev":
+    importance = np.std(shap_matrix, axis=0)
+else:
+    importance = np.abs(shap_matrix).mean(axis=0)
 
-    try:
-        idx_x = readable_names.index(feature1)
-        idx_y = readable_names.index(feature2)
-        idx_z = readable_names.index(shap_target)
+top_indices = np.argsort(importance)[-top_n:]
+sorted_idx = top_indices[np.argsort(importance[top_indices])]
 
-        def safe_column(matrix, idx):
-            col = matrix[:, idx]
-            return col.toarray().flatten() if hasattr(col, "toarray") else np.array(col).flatten()
+fig_bar, ax_bar = plt.subplots(figsize=(10, 6))
+ax_bar.barh(
+    [feature_names[i] for i in sorted_idx],
+    importance[sorted_idx],
+    color="teal"
+)
+ax_bar.set_xlabel(stat_choice)
+ax_bar.set_title("Global SHAP Feature Importance")
+st.pyplot(fig_bar)
 
-        x_vals = safe_column(X_preprocessed, idx_x)
-        y_vals = safe_column(X_preprocessed, idx_y)
-        z_vals = shap_values[:, idx_z].values.flatten()
+# ============================================================
+# SHAP VALUE SCATTER PLOT
+# ============================================================
 
-        fig = px.scatter_3d(
-            x=x_vals,
-            y=y_vals,
-            z=z_vals,
-            color=z_vals,
-            labels={"x": feature1, "y": feature2, "z": f"SHAP: {shap_target}"},
-            opacity=0.7
-        )
-        fig.update_layout(margin=dict(l=0, r=0, b=0, t=30))
-        st.plotly_chart(fig, use_container_width=True)
+st.subheader("🎯 SHAP Value Scatter Plot by Feature")
 
-    except Exception as e:
-        st.error(f"Could not generate SHAP plot: {e}")
+excluded = ["deal_no", "id", "master_deal_no"]
+dropdown_features = [f for f in feature_names if not any(ex in f.lower() for ex in excluded)]
+
+selected_feature = st.selectbox("Select a feature to explain", dropdown_features)
+
+try:
+    feature_idx = list(feature_names).index(selected_feature)
+    feature_vals = X_preprocessed[:, feature_idx]
+
+    if hasattr(feature_vals, "toarray"):
+        feature_vals = feature_vals.toarray().flatten()
+    else:
+        feature_vals = np.array(feature_vals).flatten()
+
+    shap_vals = shap_values[:, feature_idx].values
+
+    st.markdown(
+        f"### SHAP Scatter Plot for: <code style='color:limegreen'>{selected_feature}</code>",
+        unsafe_allow_html=True
+    )
+
+    fig, ax = plt.subplots()
+    ax.scatter(feature_vals, shap_vals, alpha=0.5, color="mediumseagreen", edgecolor="black")
+    ax.set_xlabel(selected_feature)
+    ax.set_ylabel("SHAP Value")
+    ax.set_title("Impact on Predicted Deal Failure Probability")
+    st.pyplot(fig)
+
+except Exception as e:
+    st.error(f"Could not generate SHAP scatter plot: {e}")

@@ -31,60 +31,10 @@ Prediction results are derived from the thesis:
 # ============================================================
 # LOAD MODEL AND FULL DATA
 # ============================================================
-# ======================
-# Load model + data
-# ======================
+
 pipeline = joblib.load("safe_pipeline_xgb.joblib")
-df = pd.read_csv("ONLY_RELEVANT_M&A.csv")
+full_data = pd.read_csv("ONLY_RELEVANT_M&A.csv")
 
-# ======================
-# Restrict to test data
-# ======================
-df["Date Announced (dateann)"] = pd.to_datetime(df["Date Announced (dateann)"], errors="coerce")
-df["ann_year"] = df["Date Announced (dateann)"].dt.year
-test_df = df[df["ann_year"] > 2019].copy()
-
-# ======================
-# Extract model components
-# ======================
-preprocessor = pipeline.named_steps["preprocessor"]
-calibrated_clf = pipeline.named_steps["classifier"]
-xgb_model = calibrated_clf.calibrated_classifiers_[0].estimator
-
-# ======================
-# Sanitize test input for transformation
-# ======================
-X_raw = test_df.drop(columns=["Deal Status (status)"], errors="ignore").copy()
-
-# Align with training-time column order
-expected_cols = preprocessor.feature_names_in_
-X_raw = X_raw.reindex(columns=expected_cols, fill_value=np.nan)
-
-# Fix dtypes
-for col in X_raw.columns:
-    if X_raw[col].dtype == "object":
-        X_raw[col] = X_raw[col].astype(str).replace("nan", "Missing").replace("None", "Missing")
-    elif pd.api.types.is_numeric_dtype(X_raw[col]):
-        X_raw[col] = pd.to_numeric(X_raw[col], errors="coerce").fillna(0)
-    else:
-        X_raw[col] = X_raw[col].astype(str).replace("nan", "Missing")
-
-X_raw = X_raw.fillna("Missing")
-
-# ======================
-# Final transform and prediction
-# ======================
-X_preprocessed = preprocessor.transform(X_raw)
-test_df["predicted_failure_prob"] = pipeline.predict_proba(X_raw)[:, 1]
-test_df["predicted_class"] = (test_df["predicted_failure_prob"] >= 0.60).astype(int)
-
-# SHAP setup
-from shap import TreeExplainer
-explainer = TreeExplainer(xgb_model)
-shap_values = explainer(X_preprocessed)
-
-# Feature names
-feature_names = preprocessor.get_feature_names_out()
 # ============================================================
 # DEAL SELECTION OR UPLOAD
 # ============================================================

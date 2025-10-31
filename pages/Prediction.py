@@ -72,28 +72,6 @@ for col in user_input.columns:
 
 failure_prob = pipeline.predict_proba(user_input)[0][1] * 100
 
-# Ensure required columns exist
-if "Date Announced (dateann)" in user_input.columns:
-    user_input["Date Announced (dateann)"] = pd.to_datetime(
-        user_input["Date Announced (dateann)"], errors="coerce"
-    )
-    user_input["ann_year"] = user_input["Date Announced (dateann)"].dt.year
-    user_input["ann_month"] = user_input["Date Announced (dateann)"].dt.month
-    user_input = user_input.drop(columns=["Date Announced (dateann)"], errors="ignore")
-
-# Reindex to match training columns
-expected_cols = pipeline.named_steps["preprocessor"].feature_names_in_
-user_input = user_input.reindex(columns=expected_cols, fill_value=np.nan)
-
-# Force clean types
-for col in user_input.columns:
-    if user_input[col].dtype == "object":
-        user_input[col] = user_input[col].astype(str).replace("nan", "Missing")
-    elif pd.api.types.is_numeric_dtype(user_input[col]):
-        user_input[col] = pd.to_numeric(user_input[col], errors="coerce").fillna(0)
-    else:
-        user_input[col] = user_input[col].astype(str).replace("nan", "Missing")
-        
 # Threshold mapping
 if failure_prob < 25:
     label = "✅ Very Low Risk of Failure"

@@ -15,8 +15,42 @@ from shap import TreeExplainer
 
 st.set_page_config(
     page_title="MedTech M&A Failure Predictor",
-    
-    with st.expander("ℹ️ What is this app? Disclaimer & Context (Click to expand)"):
+    page_icon="🧬",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+# ============================================================
+# STYLING
+# ============================================================
+
+st.markdown("""
+    <link href="https://fonts.googleapis.com/css2?family=Lato&display=swap" rel="stylesheet">
+    <style>
+    html, body, [class*="css"] {
+        font-family: 'Lato', sans-serif;
+        background-color: #0B1A28;
+        color: white;
+    }
+    footer {visibility: hidden;}
+    .block-container {
+        padding-top: 2rem;
+        padding-bottom: 2rem;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
+plt.style.use("dark_background")
+sns.set_style("darkgrid")
+sns.set_palette("dark")
+
+st.title("MedTech M&A Failure Prediction Summary")
+
+# ============================================================
+# INTRODUCTION EXPANDER
+# ============================================================
+
+with st.expander("ℹ️ What is this app? Disclaimer & Context (Click to expand)"):
     st.markdown("""
     ### 🎓 Thesis Context and Academic Objective  
     This interactive application is part of the Bachelor’s thesis:  
@@ -52,37 +86,6 @@ st.set_page_config(
     ### 🧬 Ready to Explore?  
     Now take your mouse and **explore some MedTech**.
     """)
-    
-    page_icon="🧬",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
-
-# ============================================================
-# STYLING
-# ============================================================
-
-st.markdown("""
-    <link href="https://fonts.googleapis.com/css2?family=Lato&display=swap" rel="stylesheet">
-    <style>
-    html, body, [class*="css"] {
-        font-family: 'Lato', sans-serif;
-        background-color: #0B1A28;
-        color: white;
-    }
-    footer {visibility: hidden;}
-    .block-container {
-        padding-top: 2rem;
-        padding-bottom: 2rem;
-    }
-    </style>
-""", unsafe_allow_html=True)
-
-plt.style.use("dark_background")
-sns.set_style("darkgrid")
-sns.set_palette("dark")
-
-st.title("MedTech M&A Failure Prediction Summary")
 
 # ============================================================
 # LOAD MODEL AND DATA
@@ -113,10 +116,7 @@ st.write("🔍 Data cleaning before transformation...")
 expected_cols = preprocessor.feature_names_in_
 X_raw = X_raw.reindex(columns=expected_cols, fill_value=np.nan)
 
-# ============================================================
-# FINAL SANITIZER: Force all columns into clean dtypes
-# ============================================================
-
+# Final sanitizer
 for col in X_raw.columns:
     if X_raw[col].dtype == "object":
         X_raw[col] = X_raw[col].astype(str).replace("nan", "Missing").replace("None", "Missing")
@@ -125,13 +125,11 @@ for col in X_raw.columns:
     else:
         X_raw[col] = X_raw[col].astype(str).replace("nan", "Missing")
 
-# Final failsafe: ensure full numeric fallback for unknowns
 X_raw = X_raw.fillna("Missing")
 
 try:
     X_preprocessed = preprocessor.transform(X_raw)
 except Exception as e:
-    # Dump diagnostic info to Streamlit
     st.error(f"⚠️ Preprocessor failed: {e}")
     nan_cols = [col for col in X_raw.columns if X_raw[col].isna().any()]
     st.write("Columns with NaNs:", nan_cols)

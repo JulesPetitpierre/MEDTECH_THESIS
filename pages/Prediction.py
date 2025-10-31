@@ -127,7 +127,7 @@ try:
     explainer = TreeExplainer(xgb_model)
     shap_values = explainer(X_input_preprocessed)
 
-    shap.plots.waterfall(shap_values[0], max_display=9, show=False)
+    shap.plots.waterfall(shap_values[0], max_display=15, show=False)
     fig = plt.gcf()
     st.pyplot(fig)
 

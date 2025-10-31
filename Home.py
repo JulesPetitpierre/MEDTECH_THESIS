@@ -97,21 +97,19 @@ readable_names = [name for name in readable_names if name not in excluded]
 
 from shap import TreeExplainer
 
-# Extract components
+# Extract components from the pipeline
 preprocessor = pipeline.named_steps["preprocessor"]
 calibrated_clf = pipeline.named_steps["classifier"]
 
-# Get the underlying XGBoost model
-xgb_model = calibrated_clf.estimator
+# Access the first fitted estimator inside the calibrated model
+xgb_model = calibrated_clf.calibrated_classifiers_[0].estimator
 
-# Preprocess data
+# Prepare the data
 X_raw = df.drop(columns=["Deal Status (status)"], errors="ignore")
 X_preprocessed = preprocessor.transform(X_raw)
-
-# Get feature names
 feature_names = preprocessor.get_feature_names_out()
 
-# SHAP with explicit TreeExplainer (works for XGBoost)
+# Create SHAP explainer
 explainer = TreeExplainer(xgb_model)
 shap_values = explainer(X_preprocessed)
 

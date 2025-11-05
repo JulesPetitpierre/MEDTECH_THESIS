@@ -101,7 +101,7 @@ X_raw = test_df.drop(columns=["Deal Status (status)"], errors="ignore")
 y = test_df["Deal Status (status)"]
 
 # Load pipeline
-pipeline = joblib.load("safe_pipeline_xgb.joblib")
+pipeline = joblib.load("safe_pipeline_xgb_streamlit.joblib")
 preprocessor = pipeline.named_steps["preprocessor"]
 
 # ============================================================

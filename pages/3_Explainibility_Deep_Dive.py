@@ -27,7 +27,7 @@ Explanations are based on **SHAP values**, quantifying how each input feature in
 # LOAD MODEL AND DATA
 # ============================================================
 
-pipeline = joblib.load("safe_pipeline_xgb.joblib")
+pipeline = joblib.load("safe_pipeline_xgb_streamlit.joblib")
 df = pd.read_csv("ONLY_RELEVANT_M&A.csv")
 
 # Use only post-2019 test data

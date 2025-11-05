@@ -32,7 +32,7 @@ Prediction results are derived from the thesis:
 # LOAD MODEL AND FULL DATA
 # ============================================================
 
-pipeline = joblib.load("safe_pipeline_xgb.joblib")
+pipeline = joblib.load("safe_pipeline_xgb_streamlit.joblib")
 full_data = pd.read_csv("ONLY_RELEVANT_M&A.csv")
 
 # ============================================================

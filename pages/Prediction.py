@@ -21,19 +21,18 @@ st.title("MedTech M&A Deal Failure Prediction and Explainability")
 
 st.markdown("""
 This tool predicts the **ex-ante failure risk** of MedTech M&A transactions using a **calibrated XGBoost classifier**.
-It also shows a **SHAP-based local explanation** for each prediction to increase interpretability.
-
-Prediction results are derived from the thesis:
-
-**“Exploring the Complex Landscape of MedTech M&A Setbacks Using Machine Learning”**
+It also shows a **SHAP-based local explanation** for interpretability.
 """)
 
 # ============================================================
-# LOAD MODEL AND FULL DATA
+# LOAD MODEL AND DATA
 # ============================================================
 
 pipeline = joblib.load("safe_pipeline_xgb_streamlit.joblib")
 full_data = pd.read_csv("ONLY_RELEVANT_M&A.csv")
+
+preprocessor = pipeline.named_steps["preprocessor"]
+expected_cols = preprocessor.feature_names_in_
 
 # ============================================================
 # DEAL SELECTION OR UPLOAD
@@ -46,33 +45,38 @@ selected_target = st.sidebar.selectbox("Select a Deal by Target Name", target_li
 st.sidebar.markdown("---")
 uploaded_file = st.sidebar.file_uploader("Or upload a new deal (CSV)", type=["csv"])
 
-# Determine input
+# Determine input source
 if uploaded_file:
     user_input = pd.read_csv(uploaded_file)
     actual_status = None
-elif selected_target:
-    selected_row = full_data[full_data["Target Name (tmanames)"] == selected_target].iloc[[0]]
-    user_input = selected_row.drop(columns=["Deal Status (status)"], errors="ignore")
-    actual_status = selected_row["Deal Status (status)"].values[0]
 else:
-    user_input = full_data.drop(columns=["Deal Status (status)"], errors="ignore").iloc[[0]]
-    actual_status = None
+    selected_row = full_data[full_data["Target Name (tmanames)"] == selected_target].iloc[[0]]
+    actual_status = selected_row["Deal Status (status)"].values[0]
+    user_input = selected_row.drop(columns=["Deal Status (status)"], errors="ignore")
 
-# Coerce numeric types (failsafe for uploaded data)
+# ============================================================
+# SANITIZE INPUT FOR PIPELINE COMPATIBILITY
+# ============================================================
+
 user_input = user_input.copy()
+
+# Reindex to expected model columns
+user_input = user_input.reindex(columns=expected_cols, fill_value=np.nan)
+
+# Type cleaning
 for col in user_input.columns:
-    try:
-        user_input[col] = pd.to_numeric(user_input[col])
-    except Exception:
-        pass
+    if user_input[col].dtype == "object":
+        user_input[col] = user_input[col].astype(str).replace(["nan", "None"], "Missing").fillna("Missing")
+    else:
+        user_input[col] = pd.to_numeric(user_input[col], errors="coerce").fillna(0)
 
 # ============================================================
 # PREDICTION
 # ============================================================
 
-failure_prob = pipeline.predict_proba(user_input)[0][1] * 100
+failure_prob = float(pipeline.predict_proba(user_input)[0][1]) * 100
 
-# Threshold mapping
+# Display-friendly label
 if failure_prob < 25:
     label = "✅ Very Low Risk of Failure"
     color = "#27ae60"
@@ -114,16 +118,11 @@ with col2:
 st.subheader("Feature Contributions to This Prediction (SHAP)")
 
 try:
-    # Get components from pipeline
-    preprocessor = pipeline.named_steps["preprocessor"]
     calibrated_clf = pipeline.named_steps["classifier"]
-    xgb_model = calibrated_clf.calibrated_classifiers_[0].estimator  # ✅ Correct access
+    xgb_model = calibrated_clf.calibrated_classifiers_[0].estimator
 
-    # Transform input
     X_input_preprocessed = preprocessor.transform(user_input)
-    feature_names = preprocessor.get_feature_names_out()
 
-    # SHAP
     explainer = TreeExplainer(xgb_model)
     shap_values = explainer(X_input_preprocessed)
 
@@ -145,21 +144,14 @@ try:
     acq_country = user_input["Acquiror Nation (anation)"].values[0]
     tgt_country = user_input["Target Nation (tnation)"].values[0]
 
-    country_data = world[
-        (world["NAME"] == acq_country) | (world["NAME"] == tgt_country)
-    ]
+    country_data = world[world["NAME"].isin([acq_country, tgt_country])]
 
-    if not country_data.empty:
-        fig, ax = plt.subplots(figsize=(10, 6))
-        world.boundary.plot(ax=ax, linewidth=0.6, edgecolor='gray')
-        country_data.plot(ax=ax, color="skyblue", edgecolor='black')
+    fig, ax = plt.subplots(figsize=(10, 6))
+    world.boundary.plot(ax=ax, linewidth=0.6, edgecolor='gray')
+    country_data.plot(ax=ax, color="skyblue", edgecolor='black')
+    ax.set_title("Acquiror and Target Locations", fontsize=12)
 
-        fig.text(0.01, 0.01, f"Acquiror: {acq_country}\nTarget: {tgt_country}",
-                 fontsize=10, ha='left', va='bottom')
-        ax.set_title("Acquiror and Target Locations", fontsize=12)
-        st.pyplot(fig)
-    else:
-        st.info("Could not match countries. Ensure valid country names.")
+    st.pyplot(fig)
 
-except Exception as e:
-    st.warning(f"Map could not be rendered: {e}")
+except Exception:
+    st.info("🌍 Country mapping unavailable for this deal.")

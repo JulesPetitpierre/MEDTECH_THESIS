@@ -142,3 +142,26 @@ ax.set_xlabel("Predicted Label")
 ax.set_ylabel("True Label")
 ax.set_title("Confusion Matrix — Calibrated XGBoost")
 st.pyplot(fig)
+
+# ============================================================
+# F1 SCORE SWEEP PLOT
+# ============================================================
+
+from sklearn.metrics import f1_score
+
+st.subheader("📈 Threshold vs. F1 Score Optimization")
+
+# Calculate F1 scores across a sweep of thresholds
+sweep_thresholds = np.linspace(0.01, 0.99, 100)
+f1_scores = [f1_score(y_true, proba >= t) for t in sweep_thresholds]
+
+# Plot
+fig_f1, ax_f1 = plt.subplots(figsize=(6, 4))
+ax_f1.plot(sweep_thresholds, f1_scores, label="F1 Score", color="skyblue")
+ax_f1.axvline(threshold, color="red", linestyle="--", label=f"Selected = {threshold:.2f}")
+ax_f1.scatter([threshold], [f1_score(y_true, y_pred)], color="red")
+ax_f1.set_xlabel("Threshold")
+ax_f1.set_ylabel("F1 Score")
+ax_f1.set_title("F1 Score vs. Classification Threshold")
+ax_f1.legend()
+st.pyplot(fig_f1)

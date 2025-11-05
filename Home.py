@@ -18,6 +18,15 @@ st.set_page_config(
 )
 
 # ============================================================
+# SIDEBAR NAVIGATION HELP
+# ============================================================
+
+with st.sidebar:
+    st.markdown("🏠 **Home** – View test set performance and confusion matrix.")
+    st.markdown("🔬 **Explainability** – Explore SHAP insights globally and locally.")
+    st.markdown("🧪 **Prediction** – Predict failure risk of any uploaded or selected deal.")
+
+# ============================================================
 # STYLING
 # ============================================================
 
@@ -41,7 +50,7 @@ plt.style.use("dark_background")
 sns.set_style("darkgrid")
 sns.set_palette("dark")
 
-st.title("MedTech M&A Failure Prediction Summary")
+st.title("🧬 MedTech M&A Failure Prediction Summary")
 
 # ============================================================
 # INTRODUCTION EXPANDER
@@ -83,7 +92,7 @@ X_raw = X_raw.reindex(columns=expected_cols, fill_value=np.nan)
 
 for col in X_raw.columns:
     if X_raw[col].dtype == "object":
-        X_raw[col] = X_raw[col].astype(str).replace("nan", "Missing").replace("None", "Missing")
+        X_raw[col] = X_raw[col].astype(str).replace(["nan", "None"], "Missing")
     else:
         X_raw[col] = pd.to_numeric(X_raw[col], errors="coerce").fillna(0)
 
@@ -96,13 +105,13 @@ except Exception as e:
     st.stop()
 
 # ============================================================
-# PREDICTIONS + THRESHOLD CONTROL
+# THRESHOLD & PREDICTIONS
 # ============================================================
-
-proba = pipeline.predict_proba(X_raw)[:, 1]
 
 st.sidebar.header("⚙️ Threshold Settings")
 threshold = st.sidebar.slider("Select classification threshold", 0.0, 1.0, 0.352, 0.01)
+
+proba = pipeline.predict_proba(X_raw)[:, 1]
 y_pred = (proba >= threshold).astype(int)
 
 # ============================================================
@@ -125,7 +134,10 @@ st.subheader("📉 Confusion Matrix")
 
 fig, ax = plt.subplots(figsize=(5, 4))
 cm = confusion_matrix(y_true, y_pred)
-sns.heatmap(cm, annot=True, fmt="d", cmap="Blues", xticklabels=["Completed", "Failed"], yticklabels=["Completed", "Failed"], ax=ax)
+sns.heatmap(cm, annot=True, fmt="d", cmap="Blues",
+            xticklabels=["Completed", "Failed"],
+            yticklabels=["Completed", "Failed"],
+            ax=ax)
 ax.set_xlabel("Predicted Label")
 ax.set_ylabel("True Label")
 ax.set_title("Confusion Matrix — Calibrated XGBoost")

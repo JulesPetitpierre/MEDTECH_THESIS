@@ -4,9 +4,9 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 import joblib
-import json
 import numpy as np
-import plotly.express as px
+from sklearn.calibration import calibration_curve
+from sklearn.metrics import confusion_matrix
 from shap import TreeExplainer
 
 # ============================================================
@@ -94,8 +94,6 @@ with st.expander("ℹ️ What is this app? Disclaimer & Context (Click to expand
 df = pd.read_csv("ONLY_RELEVANT_M&A.csv")
 df["Date Announced (dateann)"] = pd.to_datetime(df["Date Announced (dateann)"], errors="coerce")
 df["ann_year"] = df["Date Announced (dateann)"].dt.year
-
-# Temporal test split
 test_df = df[df["ann_year"] > 2019].copy()
 
 # Extract features and target
@@ -107,16 +105,14 @@ pipeline = joblib.load("safe_pipeline_xgb.joblib")
 preprocessor = pipeline.named_steps["preprocessor"]
 
 # ============================================================
-# HARD FIX: sanitize every column type for encoder safety
+# SANITIZE INPUT
 # ============================================================
 
 st.write("🔍 Data cleaning before transformation...")
 
-# Align with trained columns
 expected_cols = preprocessor.feature_names_in_
 X_raw = X_raw.reindex(columns=expected_cols, fill_value=np.nan)
 
-# Final sanitizer
 for col in X_raw.columns:
     if X_raw[col].dtype == "object":
         X_raw[col] = X_raw[col].astype(str).replace("nan", "Missing").replace("None", "Missing")
@@ -131,10 +127,6 @@ try:
     X_preprocessed = preprocessor.transform(X_raw)
 except Exception as e:
     st.error(f"⚠️ Preprocessor failed: {e}")
-    nan_cols = [col for col in X_raw.columns if X_raw[col].isna().any()]
-    st.write("Columns with NaNs:", nan_cols)
-    mixed_cols = [col for col in X_raw.columns if X_raw[col].map(type).nunique() > 1]
-    st.write("Columns with mixed types:", mixed_cols)
     st.stop()
 
 # ============================================================
@@ -145,60 +137,44 @@ test_df["predicted_failure_prob"] = pipeline.predict_proba(X_raw)[:, 1]
 test_df["predicted_class"] = (test_df["predicted_failure_prob"] >= 0.60).astype(int)
 
 # ============================================================
-# SHAP EXPLAINER
-# ============================================================
-
-calibrated_clf = pipeline.named_steps["classifier"]
-xgb_model = calibrated_clf.calibrated_classifiers_[0].estimator
-explainer = TreeExplainer(xgb_model)
-shap_values = explainer(X_preprocessed)
-
-# ============================================================
-# SUMMARY METRICS
+# METRICS
 # ============================================================
 
 st.metric("Total Deals (Test)", len(test_df))
-st.metric("Actual Failures", int(test_df["Deal Status (status)"].sum()))
+st.metric("Actual Failures", int(y.sum()))
 st.metric("Predicted Failures (≥60%)", int(test_df["predicted_class"].sum()))
 st.metric("Avg. Predicted Risk (%)", round(test_df["predicted_failure_prob"].mean() * 100, 2))
 
 # ============================================================
-# SHAP 3D VISUALIZATION
+# VISUALIZATIONS
 # ============================================================
 
-st.subheader("3D SHAP Interaction Explorer")
+st.subheader("🔍 Reliability, Distribution, and Confusion Matrix")
 
-with open("columns.json") as f:
-    readable_names = json.load(f)
-excluded = ["Unique Deal ID", "dateann", "Unique DEAL ID (master_deal_no)"]
-readable_names = [n for n in readable_names if n not in excluded]
+# 1. Reliability Curve
+fig1, ax1 = plt.subplots()
+true_prob, pred_prob = calibration_curve(y, test_df["predicted_failure_prob"], n_bins=10)
+ax1.plot(pred_prob, true_prob, "o-", label="XGBoost Calibrated")
+ax1.plot([0, 1], [0, 1], "k--", label="Perfect Calibration")
+ax1.set_xlabel("Predicted Probability")
+ax1.set_ylabel("Observed Frequency")
+ax1.set_title("Calibration Curve")
+ax1.legend()
+st.pyplot(fig1)
 
-col3, col4, col5 = st.columns(3)
-feature1 = col3.selectbox("X-axis", readable_names)
-feature2 = col4.selectbox("Y-axis", readable_names)
-feature3 = col5.selectbox("Z-axis (SHAP of)", readable_names)
+# 2. Histogram of predicted probabilities
+fig2, ax2 = plt.subplots()
+sns.histplot(test_df, x="predicted_failure_prob", hue="Deal Status (status)", bins=20, ax=ax2, palette="coolwarm", element="step", stat="count", common_norm=False)
+ax2.set_title("Prediction Probability Histogram")
+ax2.set_xlabel("Predicted Probability of Failure")
+ax2.set_ylabel("Count")
+st.pyplot(fig2)
 
-try:
-    idx_x = readable_names.index(feature1)
-    idx_y = readable_names.index(feature2)
-    idx_z = readable_names.index(feature3)
-
-    def safe_col(matrix, idx):
-        col = matrix[:, idx]
-        return col.toarray().flatten() if hasattr(col, "toarray") else np.array(col).flatten()
-
-    x_vals = safe_col(X_preprocessed, idx_x)
-    y_vals = safe_col(X_preprocessed, idx_y)
-    z_vals = shap_values[:, idx_z].values.flatten()
-
-    fig = px.scatter_3d(
-        x=x_vals, y=y_vals, z=z_vals,
-        color=z_vals,
-        labels={"x": feature1, "y": feature2, "z": f"SHAP: {feature3}"},
-        opacity=0.7
-    )
-    fig.update_layout(margin=dict(l=0, r=0, b=0, t=30))
-    st.plotly_chart(fig, use_container_width=True)
-
-except Exception as e:
-    st.error(f"Could not generate SHAP plot: {e}")
+# 3. Confusion Matrix
+fig3, ax3 = plt.subplots()
+cm = confusion_matrix(y, test_df["predicted_class"])
+sns.heatmap(cm, annot=True, fmt="d", cmap="Blues", xticklabels=["Completed", "Failed"], yticklabels=["Completed", "Failed"], ax=ax3)
+ax3.set_xlabel("Predicted label")
+ax3.set_ylabel("True label")
+ax3.set_title("Confusion Matrix")
+st.pyplot(fig3)

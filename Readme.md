@@ -106,7 +106,7 @@ Refer to: `20-613-220_Jules_Petitpierre_Thesis.pdf`
 This project is academic work submitted for the completion of a Bachelor's degree and cannot be used in any way by any third party.
 ---
 
-## 🙏 Acknowledgements and Aids
+## Acknowledgements and Aids
 - Prof. Dr. Despoina Makariou (Supervisor)
 - Streamlit, SHAP, WRDS, Pitchbook
 - All researchers and authors cited in the thesis (see bibliography)

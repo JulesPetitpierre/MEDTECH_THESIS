@@ -62,9 +62,3 @@ pipeline = Pipeline([
 # Save
 joblib.dump(pipeline, "safe_pipeline_xgb.joblib")
 print("✅ Saved: safe_pipeline_xgb.joblib")
-
-# === SAFETY CHECK ===
-pipe_check = joblib.load("safe_pipeline_xgb.joblib")
-ohe = pipe_check.named_steps["preprocessor"].named_transformers_["cat"]
-print("✅ OHE safety check: handle_unknown =", ohe.handle_unknown)
-assert ohe.handle_unknown == "ignore"

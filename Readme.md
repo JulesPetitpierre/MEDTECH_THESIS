@@ -2,17 +2,12 @@
 
 This repository contains the full codebase, data schema, and deployment files for the Bachelor Thesis:
 
-**"Predicting Pre-Closing M&A Deal Failures in the MedTech Sector Using Machine Learning"**  
+**"Decoding Mergers & Acquisitions Failures:
+Exploring The Complex Landscape of MedTech M&A Setbacks Through Advanced Risk Modeling Techniques
+"**  
 Author: *Jules Petitpierre*  
 University of St. Gallen (HSG), 2025  
 Supervisor: Prof. Dr. Despoina Makariou
-
----
-
-## 🔍 Project Summary
-This thesis investigates whether announced MedTech M&A transactions can be reliably predicted to fail (i.e., be withdrawn or terminated) before closing, using only publicly available deal- and firm-level data from the time of announcement.
-
-A predictive framework was developed using machine learning models—primarily calibrated **XGBoost**, with benchmarks including **Random Forest** and **ElasticNet**—and was deployed as an interactive **Streamlit web application**.
 
 ---
 
@@ -35,28 +30,6 @@ A predictive framework was developed using machine learning models—primarily c
 - **pandas, scikit-learn, xgboost, shap, joblib**
 - **Streamlit** for front-end web app
 - **Matplotlib, Seaborn** for visuals
-
----
-
-## How to Run the App Locally
-
-### 1. Clone the Repository
-```bash
-git clone https://github.com/yourusername/medtech-ma-failure-prediction.git
-cd medtech-ma-failure-prediction
-```
-
-### 2. Set Up Virtual Environment
-```bash
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-```
-
-### 3. Run Streamlit App
-```bash
-streamlit run Home.py
-```
 
 ---
 
@@ -95,13 +68,6 @@ Refer to: `20-613-220_Jules_Petitpierre_Thesis.pdf`
 
 ---
 
-## Contact
-**Jules Petitpierre**  
-*Bachelor in Business Administration, University of St. Gallen*  
-[jules.petitpierre@students.unisg.ch](mailto:jules.petitpierre@students.unisg.ch)
-
----
-
 ## License
 This project is academic work submitted for the completion of a Bachelor's degree and cannot be used in any way by any third party.
 ---
@@ -110,6 +76,6 @@ This project is academic work submitted for the completion of a Bachelor's degre
 - Prof. Dr. Despoina Makariou (Supervisor)
 - Streamlit, SHAP, WRDS, Pitchbook
 - All researchers and authors cited in the thesis (see bibliography)
-- Chat GPT4o for structuring, correcting and simplifying codes when needed
+- Chat GPT4o for structuring, debugging and simplifying model codes and streamlit codes when needed
 
 ---

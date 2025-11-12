@@ -76,6 +76,6 @@ This project is academic work submitted for the completion of a Bachelor's degre
 - Prof. Dr. Despoina Makariou (Supervisor)
 - Streamlit, SHAP, WRDS, Pitchbook
 - All researchers and authors cited in the thesis (see bibliography)
-- Chat GPT4o for structuring, debugging and simplifying model codes and streamlit codes when needed
+- Chat GPT (GPT-5.1) for structuring, debugging and simplifying model codes and streamlit codes when needed
 
 ---

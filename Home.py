@@ -60,10 +60,10 @@ with st.expander("ℹ️ What is this app? Disclaimer & Context (Click to expand
     st.markdown("""
     ### 🎓 Thesis Context and Academic Objective  
     This interactive application is part of the Bachelor’s thesis:  
-    **“Exploring the Complex Landscape of MedTech M&A Setbacks Using Machine Learning”**  
+    **“Exploring the Complex Landscape of MedTech M&A Setbacks Through Advanced Risk Modeling Techniques”**  
     submitted at the **University of St. Gallen (HSG)**.  
 
-    The tool translates a calibrated XGBoost classification model into a user-facing interface. It enables exploration of **predicted failure probabilities** for MedTech M&A transactions between 2014 and 2025. Failure is defined as deals that were announced but not completed (i.e., withdrawn or terminated).  
+    The tool translates a calibrated XGBoost classification model into a user-facing interface. It enables exploration of **predicted failure probabilities** for MedTech M&A transactions between 2020 and 2025 (test set). Failure is defined as deals that were announced but not completed (i.e., withdrawn or terminated).  
 
     The predictions are based on a calibrated XGBoost classifier trained using Scikit-learn and SHAP. All predictions and explanations shown here are **out-of-sample**, derived from the test data split (post-2019 deals).
     """)

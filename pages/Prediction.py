@@ -78,16 +78,16 @@ failure_prob = float(pipeline.predict_proba(user_input)[0][1]) * 100
 
 # Display-friendly label
 if failure_prob < 25:
-    label = "✅ Very Low Risk of Failure"
+    label = "Very Low Risk of Failure"
     color = "#27ae60"
 elif failure_prob < 50:
-    label = "🟢 Likely to Succeed"
+    label = "Likely to Succeed"
     color = "#2ecc71"
 elif failure_prob < 75:
-    label = "🟠 Moderate Risk"
+    label = "Moderate Risk"
     color = "#e67e22"
 else:
-    label = "🔴 High Risk of Failure"
+    label = "High Risk of Failure"
     color = "#e74c3c"
 
 # ============================================================
@@ -107,12 +107,12 @@ with col1:
 with col2:
     if actual_status is not None:
         if actual_status == 1:
-            st.markdown("<h4 style='color:#e74c3c;'>🟥 Actual Outcome: Deal Withdrawn</h4>", unsafe_allow_html=True)
+            st.markdown("<h4 style='color:#e74c3c;'>Actual Outcome: Deal Withdrawn</h4>", unsafe_allow_html=True)
         else:
-            st.markdown("<h4 style='color:#27ae60;'>🟩 Actual Outcome: Deal Completed</h4>", unsafe_allow_html=True)
+            st.markdown("<h4 style='color:#27ae60;'>Actual Outcome: Deal Completed</h4>", unsafe_allow_html=True)
 
 # ============================================================
-# SHAP EXPLANATION
+# SHAP EXPLANATION (with real feature names)
 # ============================================================
 
 st.subheader("Feature Contributions to This Prediction (SHAP)")
@@ -121,11 +121,18 @@ try:
     calibrated_clf = pipeline.named_steps["classifier"]
     xgb_model = calibrated_clf.calibrated_classifiers_[0].estimator
 
+    # Transform with preprocessing
     X_input_preprocessed = preprocessor.transform(user_input)
 
+    # SHAP explainer
     explainer = TreeExplainer(xgb_model)
     shap_values = explainer(X_input_preprocessed)
 
+    # Assign actual transformed feature names
+    feature_names = preprocessor.get_feature_names_out()
+    shap_values.feature_names = feature_names
+
+    # Waterfall plot
     shap.plots.waterfall(shap_values[0], max_display=15, show=False)
     fig = plt.gcf()
     st.pyplot(fig)
@@ -154,4 +161,4 @@ try:
     st.pyplot(fig)
 
 except Exception:
-    st.info("🌍 Country mapping unavailable for this deal.")
+    st.info("Country mapping unavailable for this deal.")
